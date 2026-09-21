@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: collabflow-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: collabflow
+      POSTGRES_PASSWORD: collabflow_dev
+      POSTGRES_DB: collabflow
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - collabflow_postgres_data:/var/lib/postgresql
+
+volumes:
+  collabflow_postgres_data:

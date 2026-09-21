@@ -35,3 +35,9 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Prisma generated agent/tool files
+server/.agents/
+server/.claude/
+server/.windsurf/
+server/skills-lock.json
