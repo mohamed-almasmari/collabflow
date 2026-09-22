@@ -1,39 +1,149 @@
-import { Link } from "react-router";
+import {
+  type FormEvent,
+  useState,
+} from "react";
+import {
+  Link,
+  useNavigate,
+} from "react-router";
 
-const RegisterPage = () => {
+import { registerUser } from "../../../api/auth.ts";
+
+function RegisterPage() {
+  const navigate = useNavigate();
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await registerUser({
+        name,
+        email,
+        password,
+      });
+
+      navigate("/login", {
+        replace: true,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Unable to create account");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main>
       <h1>Create your CollabFlow account</h1>
-      <form>
+
+      <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="name">Name</label>
-          <input type="text" id="name" name="name" placeholder="Your name" />
-        </div>
-        <div>
-          <label htmlFor="email">Email</label>
+          <label htmlFor="name">
+            Name
+          </label>
+
           <input
-            type="email"
+            id="name"
+            name="name"
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="email">
+            Email
+          </label>
+
+          <input
             id="email"
             name="email"
-            placeholder="email@example.com"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
           />
         </div>
+
         <div>
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">
+            Password
+          </label>
+
           <input
-            type="password"
             id="password"
             name="password"
-            placeholder="Create a password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            minLength={8}
+            required
           />
         </div>
-        <button type="submit">Create account</button>
+
+        <div>
+          <label htmlFor="confirmPassword">
+            Confirm password
+          </label>
+
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(event) =>
+              setConfirmPassword(event.target.value)
+            }
+            minLength={8}
+            required
+          />
+        </div>
+
+        {error && (
+          <p role="alert">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+        >
+          {loading ? "Creating account..." : "Create account"}
+        </button>
       </form>
+
       <p>
-        Already have an account? <Link to="/login">Sing in</Link>
+        Already have an account?{" "}
+        <Link to="/login">
+          Sign in
+        </Link>
       </p>
     </main>
   );
-};
+}
 
 export default RegisterPage;
