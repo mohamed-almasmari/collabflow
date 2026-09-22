@@ -11,12 +11,25 @@ export const registerSchema = z.object({
     .string()
     .trim()
     .email("Enter a valid email address")
-    .transform((email) => email.toLocaleLowerCase()),
+    .transform((email) => email.toLowerCase()),
 
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
-    .max(128, "Pawwsord must be 128 characters or less"),
+    .max(128, "Password must be 128 characters or less"),
+});
+
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("Enter a valid email address")
+    .transform((email) => email.toLowerCase()),
+
+  password: z
+    .string()
+    .min(1, "Password is required"),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

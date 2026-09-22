@@ -1,8 +1,12 @@
 import type { Request, Response } from "express";
-import { hash } from "argon2";
+import { hash, verify } from "argon2";
 
 import { prisma } from "../config/database.js";
-import { registerSchema } from "../validators/auth.schema.js";
+import { createAccessToken } from "../utils/jwt.js";
+import {
+  loginSchema,
+  registerSchema,
+} from "../validators/auth.schema.js";
 
 export async function register(req: Request, res: Response) {
   const result = registerSchema.safeParse(req.body);
@@ -54,6 +58,62 @@ export async function register(req: Request, res: Response) {
 
     return res.status(500).json({
       message: "Unable to create account",
+    });
+  }
+}
+
+export async function login(req: Request, res: Response) {
+  const result = loginSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Invalid login data",
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
+
+  const { email, password } = result.data;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    const passwordMatches = await verify(
+      user.passwordHash,
+      password,
+    );
+
+    if (!passwordMatches) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    const accessToken = await createAccessToken(user.id);
+
+    return res.status(200).json({
+      message: "Login successful",
+      accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Login failed:", error);
+
+    return res.status(500).json({
+      message: "Unable to login",
     });
   }
 }
