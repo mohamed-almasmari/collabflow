@@ -3,10 +3,9 @@ import { hash, verify } from "argon2";
 
 import { prisma } from "../config/database.js";
 import { createAccessToken } from "../utils/jwt.js";
-import {
-  loginSchema,
-  registerSchema,
-} from "../validators/auth.schema.js";
+import { loginSchema, registerSchema } from "../validators/auth.schema.js";
+
+import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 
 export async function register(req: Request, res: Response) {
   const result = registerSchema.safeParse(req.body);
@@ -87,10 +86,7 @@ export async function login(req: Request, res: Response) {
       });
     }
 
-    const passwordMatches = await verify(
-      user.passwordHash,
-      password,
-    );
+    const passwordMatches = await verify(user.passwordHash, password);
 
     if (!passwordMatches) {
       return res.status(401).json({
@@ -114,6 +110,43 @@ export async function login(req: Request, res: Response) {
 
     return res.status(500).json({
       message: "Unable to login",
+    });
+  }
+}
+export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: req.userId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      user,
+    });
+  } catch (error) {
+    console.error("Failed to load current user:", error);
+
+    return res.status(500).json({
+      message: "Unable to load current user",
     });
   }
 }
