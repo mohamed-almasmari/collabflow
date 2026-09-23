@@ -116,3 +116,93 @@ export async function getWorkspaces(req: AuthenticatedRequest, res: Response) {
     });
   }
 }
+
+export async function getWorkspaceById(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  const workspaceId = req.params.workspaceId;
+
+  if (typeof workspaceId !== "string") {
+    return res.status(400).json({
+      message: "Workspace ID is required",
+    });
+  }
+
+  try {
+    const membership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: req.userId,
+        },
+      },
+
+      include: {
+        workspace: {
+          include: {
+            owner: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(403).json({
+        message: "You do not have access to this workspace",
+      });
+    }
+
+    return res.status(200).json({
+      workspace: {
+        id: membership.workspace.id,
+        name: membership.workspace.name,
+        description: membership.workspace.description,
+        ownerId: membership.workspace.ownerId,
+        createdAt: membership.workspace.createdAt,
+        updatedAt: membership.workspace.updatedAt,
+
+        owner: membership.workspace.owner,
+
+        currentUserRole: membership.role,
+
+        members: membership.workspace.members.map((member) => ({
+          id: member.id,
+          role: member.role,
+          joinedAt: member.joinedAt,
+          user: member.user,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to load workspace:", error);
+
+    return res.status(500).json({
+      message: "Unable to load workspace",
+    });
+  }
+}
