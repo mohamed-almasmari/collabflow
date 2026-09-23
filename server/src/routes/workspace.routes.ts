@@ -12,13 +12,17 @@ import {
 
 import { requireAuth } from "../middleware/auth.middleware.js";
 
+import projectRoutes from "./project.routes.js";
+
 const router = Router();
 
 router.get("/", requireAuth, getWorkspaces);
 
-router.get("/:workspaceId", requireAuth, getWorkspaceById);
-
 router.post("/", requireAuth, createWorkspace);
+
+router.use("/:workspaceId/projects", projectRoutes);
+
+router.get("/:workspaceId", requireAuth, getWorkspaceById);
 
 router.patch("/:workspaceId", requireAuth, updateWorkspace);
 
@@ -35,4 +39,5 @@ router.delete(
   requireAuth,
   removeWorkspaceMember,
 );
+
 export default router;
