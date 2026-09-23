@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-
+import cookieParser from "cookie-parser";
 import { prisma } from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
 
@@ -11,9 +11,11 @@ const PORT = 3000;
 app.use(
   cors({
     origin: "http://localhost:5173",
+    credentials:true,
   }),
 );
 
+app.use(cookieParser());
 app.use(express.json());
 
 app.get("/api/health", async (_req, res) => {

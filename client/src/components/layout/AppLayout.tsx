@@ -1,21 +1,14 @@
-import {
-  Link,
-  Outlet,
-  useNavigate,
-} from "react-router";
+import { Link, Outlet, useNavigate } from "react-router";
 
 import { useAuth } from "../../hooks/useAuth";
 
 function AppLayout() {
   const navigate = useNavigate();
 
-  const {
-    user,
-    logout,
-  } = useAuth();
+  const { user, logout } = useAuth();
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
 
     navigate("/login", {
       replace: true,
@@ -26,18 +19,11 @@ function AppLayout() {
     <div>
       <header>
         <nav>
-          <Link to="/dashboard">
-            CollabFlow
-          </Link>
+          <Link to="/dashboard">CollabFlow</Link>
 
-          <span>
-            {user?.name}
-          </span>
+          <span>{user?.name}</span>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-          >
+          <button type="button" onClick={handleLogout}>
             Logout
           </button>
         </nav>
