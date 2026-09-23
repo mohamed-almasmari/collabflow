@@ -3,6 +3,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { prisma } from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
+import workspaceRoutes from "./routes/workspace.routes.js";
 
 const app = express();
 
@@ -11,7 +12,7 @@ const PORT = 3000;
 app.use(
   cors({
     origin: "http://localhost:5173",
-    credentials:true,
+    credentials: true,
   }),
 );
 
@@ -39,6 +40,7 @@ app.get("/api/health", async (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/workspaces", workspaceRoutes);
 
 app.listen(PORT, () => {
   console.log(`CollabFlow API running on http://localhost:${PORT}`);
