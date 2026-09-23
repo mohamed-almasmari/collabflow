@@ -37,3 +37,19 @@ export const updateWorkspaceSchema = z
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
+
+export const addWorkspaceMemberSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("Enter a valid email address")
+    .transform((email) => email.toLowerCase()),
+
+  role: z
+    .enum(["ADMIN", "MEMBER"])
+    .default("MEMBER"),
+});
+
+export type AddWorkspaceMemberInput = z.infer<
+  typeof addWorkspaceMemberSchema
+>;

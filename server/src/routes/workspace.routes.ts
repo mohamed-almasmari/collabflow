@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import {
+  addWorkspaceMember,
   createWorkspace,
   getWorkspaceById,
   getWorkspaces,
@@ -19,4 +20,5 @@ router.post("/", requireAuth, createWorkspace);
 
 router.patch("/:workspaceId", requireAuth, updateWorkspace);
 
+router.post("/:workspaceId/members", requireAuth, addWorkspaceMember);
 export default router;
