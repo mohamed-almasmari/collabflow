@@ -30,7 +30,7 @@ export async function createWorkspace(
       const createdWorkspace = await tx.workspace.create({
         data: {
           name,
-          description,
+          description: description ?? null,
           ownerId: req.userId!,
         },
       });
@@ -55,6 +55,64 @@ export async function createWorkspace(
 
     return res.status(500).json({
       message: "Unable to create workspace",
+    });
+  }
+}
+
+export async function getWorkspaces(req: AuthenticatedRequest, res: Response) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  try {
+    const memberships = await prisma.workspaceMember.findMany({
+      where: {
+        userId: req.userId,
+      },
+
+      include: {
+        workspace: {
+          include: {
+            owner: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+
+      orderBy: {
+        joinedAt: "desc",
+      },
+    });
+
+    const workspaces = memberships.map((membership) => ({
+      id: membership.workspace.id,
+      name: membership.workspace.name,
+      description: membership.workspace.description,
+      ownerId: membership.workspace.ownerId,
+      createdAt: membership.workspace.createdAt,
+      updatedAt: membership.workspace.updatedAt,
+
+      owner: membership.workspace.owner,
+
+      role: membership.role,
+      joinedAt: membership.joinedAt,
+    }));
+
+    return res.status(200).json({
+      workspaces,
+    });
+  } catch (error) {
+    console.error("Failed to load workspaces:", error);
+
+    return res.status(500).json({
+      message: "Unable to load workspaces",
     });
   }
 }
