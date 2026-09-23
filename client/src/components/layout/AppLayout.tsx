@@ -4,13 +4,18 @@ import {
   useNavigate,
 } from "react-router";
 
-import { removeAccessToken } from "../../utils/authToken";
+import { useAuth } from "../../hooks/useAuth";
 
 function AppLayout() {
   const navigate = useNavigate();
 
+  const {
+    user,
+    logout,
+  } = useAuth();
+
   function handleLogout() {
-    removeAccessToken();
+    logout();
 
     navigate("/login", {
       replace: true,
@@ -24,6 +29,10 @@ function AppLayout() {
           <Link to="/dashboard">
             CollabFlow
           </Link>
+
+          <span>
+            {user?.name}
+          </span>
 
           <button
             type="button"

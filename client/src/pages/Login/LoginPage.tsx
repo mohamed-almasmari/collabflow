@@ -4,20 +4,34 @@ import {
 } from "react";
 import {
   Link,
+  Navigate,
   useNavigate,
 } from "react-router";
 
-import { loginUser } from "../../../api/auth";
-import { setAccessToken } from "../../utils/authToken";
+import { useAuth } from "../../hooks/useAuth";
 
 function LoginPage() {
   const navigate = useNavigate();
+
+  const {
+    login,
+    isAuthenticated,
+  } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  if (isAuthenticated) {
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,12 +41,10 @@ function LoginPage() {
     try {
       setLoading(true);
 
-      const response = await loginUser({
+      await login({
         email,
         password,
       });
-
-      setAccessToken(response.accessToken);
 
       navigate("/dashboard", {
         replace: true,
@@ -60,7 +72,6 @@ function LoginPage() {
 
           <input
             id="email"
-            name="email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -75,7 +86,6 @@ function LoginPage() {
 
           <input
             id="password"
-            name="password"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}

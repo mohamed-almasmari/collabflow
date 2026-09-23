@@ -1,44 +1,23 @@
-import {
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import type { ReactNode } from "react";
 import { Navigate } from "react-router";
 
-import { getCurrentUser } from "../../../api/auth";
-import { removeAccessToken } from "../../utils/authToken";
+import { useAuth } from "../../hooks/useAuth";
 
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
-function ProtectedRoute({
-  children,
-}: ProtectedRouteProps) {
-  const [authenticated, setAuthenticated] =
-    useState<boolean | null>(null);
+function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const {
+    loading,
+    isAuthenticated,
+  } = useAuth();
 
-  useEffect(() => {
-    async function verifyAuthentication() {
-      try {
-        await getCurrentUser();
-
-        setAuthenticated(true);
-      } catch {
-        removeAccessToken();
-
-        setAuthenticated(false);
-      }
-    }
-
-    verifyAuthentication();
-  }, []);
-
-  if (authenticated === null) {
+  if (loading) {
     return <p>Checking authentication...</p>;
   }
 
-  if (!authenticated) {
+  if (!isAuthenticated) {
     return (
       <Navigate
         to="/login"
