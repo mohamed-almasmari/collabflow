@@ -14,6 +14,26 @@ export const createWorkspaceSchema = z.object({
     .optional(),
 });
 
-export type CreateWorkspaceInput = z.infer<
-  typeof createWorkspaceSchema
->;
+export const updateWorkspaceSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Workspace name must be at least 2 characters")
+      .max(100, "Workspace name must be 100 characters or less")
+      .optional(),
+
+    description: z
+      .string()
+      .trim()
+      .max(500, "Description must be 500 characters or less")
+      .nullable()
+      .optional(),
+  })
+  .refine((data) => data.name !== undefined || data.description !== undefined, {
+    message: "At least one workspace field must be provided",
+  });
+
+export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
+
+export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;

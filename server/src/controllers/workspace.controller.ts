@@ -3,6 +3,7 @@ import type { Response } from "express";
 import { prisma } from "../config/database.js";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import { createWorkspaceSchema } from "../validators/workspace.schema.js";
+import { updateWorkspaceSchema } from "../validators/workspace.schema.js";
 
 export async function createWorkspace(
   req: AuthenticatedRequest,
@@ -203,6 +204,84 @@ export async function getWorkspaceById(
 
     return res.status(500).json({
       message: "Unable to load workspace",
+    });
+  }
+}
+
+export async function updateWorkspace(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  const workspaceId = req.params.workspaceId;
+
+  if (typeof workspaceId !== "string") {
+    return res.status(400).json({
+      message: "Workspace ID is required",
+    });
+  }
+
+  const result = updateWorkspaceSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Invalid workspace data",
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
+
+  try {
+    const membership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: req.userId,
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(403).json({
+        message: "You do not have access to this workspace",
+      });
+    }
+
+    if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+      return res.status(403).json({
+        message: "You do not have permission to update this workspace",
+      });
+    }
+
+    const workspace = await prisma.workspace.update({
+      where: {
+        id: workspaceId,
+      },
+
+      data: {
+        ...(result.data.name !== undefined && {
+          name: result.data.name,
+        }),
+
+        ...(result.data.description !== undefined && {
+          description: result.data.description,
+        }),
+      },
+    });
+
+    return res.status(200).json({
+      message: "Workspace updated successfully",
+      workspace,
+    });
+  } catch (error) {
+    console.error("Workspace update failed:", error);
+
+    return res.status(500).json({
+      message: "Unable to update workspace",
     });
   }
 }
