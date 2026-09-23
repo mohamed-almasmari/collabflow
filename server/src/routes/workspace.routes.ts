@@ -5,7 +5,9 @@ import {
   createWorkspace,
   getWorkspaceById,
   getWorkspaces,
+  removeWorkspaceMember,
   updateWorkspace,
+  updateWorkspaceMemberRole,
 } from "../controllers/workspace.controller.js";
 
 import { requireAuth } from "../middleware/auth.middleware.js";
@@ -21,4 +23,16 @@ router.post("/", requireAuth, createWorkspace);
 router.patch("/:workspaceId", requireAuth, updateWorkspace);
 
 router.post("/:workspaceId/members", requireAuth, addWorkspaceMember);
+
+router.patch(
+  "/:workspaceId/members/:memberId",
+  requireAuth,
+  updateWorkspaceMemberRole,
+);
+
+router.delete(
+  "/:workspaceId/members/:memberId",
+  requireAuth,
+  removeWorkspaceMember,
+);
 export default router;

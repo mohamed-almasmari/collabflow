@@ -5,6 +5,7 @@ import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import {
   addWorkspaceMemberSchema,
   createWorkspaceSchema,
+  updateWorkspaceMemberRoleSchema,
   updateWorkspaceSchema,
 } from "../validators/workspace.schema.js";
 
@@ -406,6 +407,226 @@ export async function addWorkspaceMember(
 
     return res.status(500).json({
       message: "Unable to add workspace member",
+    });
+  }
+}
+
+export async function removeWorkspaceMember(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  const workspaceId = req.params.workspaceId;
+  const memberId = req.params.memberId;
+
+  if (typeof workspaceId !== "string" || typeof memberId !== "string") {
+    return res.status(400).json({
+      message: "Workspace ID and member ID are required",
+    });
+  }
+
+  try {
+    const requestingMembership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: req.userId,
+        },
+      },
+    });
+
+    if (!requestingMembership) {
+      return res.status(403).json({
+        message: "You do not have access to this workspace",
+      });
+    }
+
+    if (
+      requestingMembership.role !== "OWNER" &&
+      requestingMembership.role !== "ADMIN"
+    ) {
+      return res.status(403).json({
+        message: "You do not have permission to remove workspace members",
+      });
+    }
+
+    const targetMembership = await prisma.workspaceMember.findUnique({
+      where: {
+        id: memberId,
+      },
+    });
+
+    if (!targetMembership || targetMembership.workspaceId !== workspaceId) {
+      return res.status(404).json({
+        message: "Workspace member not found",
+      });
+    }
+
+    if (targetMembership.role === "OWNER") {
+      return res.status(403).json({
+        message: "The workspace owner cannot be removed",
+      });
+    }
+
+    if (
+      requestingMembership.role === "ADMIN" &&
+      targetMembership.role === "ADMIN"
+    ) {
+      return res.status(403).json({
+        message: "Admins cannot remove another admin",
+      });
+    }
+
+    await prisma.workspaceMember.delete({
+      where: {
+        id: memberId,
+      },
+    });
+
+    return res.status(200).json({
+      message: "Workspace member removed successfully",
+    });
+  } catch (error) {
+    console.error("Failed to remove workspace member:", error);
+
+    return res.status(500).json({
+      message: "Unable to remove workspace member",
+    });
+  }
+}
+
+export async function updateWorkspaceMemberRole(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  const workspaceId = req.params.workspaceId;
+  const memberId = req.params.memberId;
+
+  if (
+    typeof workspaceId !== "string" ||
+    typeof memberId !== "string"
+  ) {
+    return res.status(400).json({
+      message: "Workspace ID and member ID are required",
+    });
+  }
+
+  const result =
+    updateWorkspaceMemberRoleSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Invalid member role",
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
+
+  try {
+    const requestingMembership =
+      await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: req.userId,
+          },
+        },
+      });
+
+    if (!requestingMembership) {
+      return res.status(403).json({
+        message: "You do not have access to this workspace",
+      });
+    }
+
+    if (
+      requestingMembership.role !== "OWNER" &&
+      requestingMembership.role !== "ADMIN"
+    ) {
+      return res.status(403).json({
+        message:
+          "You do not have permission to manage workspace members",
+      });
+    }
+
+    const targetMembership =
+      await prisma.workspaceMember.findUnique({
+        where: {
+          id: memberId,
+        },
+      });
+
+    if (
+      !targetMembership ||
+      targetMembership.workspaceId !== workspaceId
+    ) {
+      return res.status(404).json({
+        message: "Workspace member not found",
+      });
+    }
+
+    if (targetMembership.role === "OWNER") {
+      return res.status(403).json({
+        message: "The workspace owner role cannot be changed",
+      });
+    }
+
+    if (targetMembership.userId === req.userId) {
+      return res.status(400).json({
+        message: "You cannot change your own workspace role",
+      });
+    }
+
+    if (
+      requestingMembership.role === "ADMIN" &&
+      targetMembership.role === "ADMIN"
+    ) {
+      return res.status(403).json({
+        message: "Admins cannot change another admin's role",
+      });
+    }
+
+    const updatedMembership =
+      await prisma.workspaceMember.update({
+        where: {
+          id: memberId,
+        },
+        data: {
+          role: result.data.role,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+    return res.status(200).json({
+      message: "Workspace member role updated successfully",
+      member: updatedMembership,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to update workspace member role:",
+      error,
+    );
+
+    return res.status(500).json({
+      message: "Unable to update workspace member role",
     });
   }
 }

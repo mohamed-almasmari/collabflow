@@ -45,11 +45,15 @@ export const addWorkspaceMemberSchema = z.object({
     .email("Enter a valid email address")
     .transform((email) => email.toLowerCase()),
 
-  role: z
-    .enum(["ADMIN", "MEMBER"])
-    .default("MEMBER"),
+  role: z.enum(["ADMIN", "MEMBER"]).default("MEMBER"),
 });
 
-export type AddWorkspaceMemberInput = z.infer<
-  typeof addWorkspaceMemberSchema
+export type AddWorkspaceMemberInput = z.infer<typeof addWorkspaceMemberSchema>;
+
+export const updateWorkspaceMemberRoleSchema = z.object({
+  role: z.enum(["ADMIN", "MEMBER"]),
+});
+
+export type UpdateWorkspaceMemberRoleInput = z.infer<
+  typeof updateWorkspaceMemberRoleSchema
 >;
