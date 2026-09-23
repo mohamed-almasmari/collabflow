@@ -13,6 +13,11 @@ enum WorkspaceRole {
   MEMBER
 }
 
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -21,10 +26,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  refreshSessions RefreshSession[]
-
+  refreshSessions  RefreshSession[]
   ownedWorkspaces  Workspace[]       @relation("WorkspaceOwner")
   workspaceMembers WorkspaceMember[]
+
+  createdProjects Project[] @relation("ProjectCreator")
 }
 
 model RefreshSession {
@@ -49,8 +55,9 @@ model Workspace {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner   User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
-  members WorkspaceMember[]
+  owner    User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members  WorkspaceMember[]
+  projects Project[]
 
   @@index([ownerId])
 }
@@ -68,4 +75,23 @@ model WorkspaceMember {
   @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+
+  workspaceId String
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("ProjectCreator", fields: [createdById], references: [id])
+
+  @@index([workspaceId])
+  @@index([createdById])
 }
