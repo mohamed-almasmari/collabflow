@@ -2,8 +2,10 @@ import type { Response } from "express";
 
 import { prisma } from "../config/database.js";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
-import { createIssueSchema } from "../validators/issue.schema.js";
-
+import {
+  createIssueSchema,
+  updateIssueSchema,
+} from "../validators/issue.schema.js";
 export async function createIssue(req: AuthenticatedRequest, res: Response) {
   if (!req.userId) {
     return res.status(401).json({
@@ -305,6 +307,164 @@ export async function getIssueById(req: AuthenticatedRequest, res: Response) {
 
     return res.status(500).json({
       message: "Unable to load issue",
+    });
+  }
+}
+
+export async function updateIssue(req: AuthenticatedRequest, res: Response) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  const workspaceId = req.params.workspaceId;
+  const projectId = req.params.projectId;
+  const issueId = req.params.issueId;
+
+  if (
+    typeof workspaceId !== "string" ||
+    typeof projectId !== "string" ||
+    typeof issueId !== "string"
+  ) {
+    return res.status(400).json({
+      message: "Workspace ID, project ID, and issue ID are required",
+    });
+  }
+
+  const result = updateIssueSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Invalid issue data",
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
+
+  try {
+    const membership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: req.userId,
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(403).json({
+        message: "You do not have access to this workspace",
+      });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        workspaceId,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    if (project.status === "ARCHIVED") {
+      return res.status(400).json({
+        message: "Cannot update issues in an archived project",
+      });
+    }
+
+    const existingIssue = await prisma.issue.findFirst({
+      where: {
+        id: issueId,
+        projectId,
+      },
+    });
+
+    if (!existingIssue) {
+      return res.status(404).json({
+        message: "Issue not found",
+      });
+    }
+
+    if (result.data.assigneeId) {
+      const assigneeMembership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: result.data.assigneeId,
+          },
+        },
+      });
+
+      if (!assigneeMembership) {
+        return res.status(400).json({
+          message: "Assignee must be a member of this workspace",
+        });
+      }
+    }
+
+    const issue = await prisma.issue.update({
+      where: {
+        id: issueId,
+      },
+
+      data: {
+        ...(result.data.title !== undefined && {
+          title: result.data.title,
+        }),
+
+        ...(result.data.description !== undefined && {
+          description: result.data.description,
+        }),
+
+        ...(result.data.status !== undefined && {
+          status: result.data.status,
+        }),
+
+        ...(result.data.priority !== undefined && {
+          priority: result.data.priority,
+        }),
+
+        ...(result.data.assigneeId !== undefined && {
+          assigneeId: result.data.assigneeId,
+        }),
+      },
+
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      message: "Issue updated successfully",
+      issue,
+    });
+  } catch (error) {
+    console.error("Issue update failed:", error);
+
+    return res.status(500).json({
+      message: "Unable to update issue",
     });
   }
 }
