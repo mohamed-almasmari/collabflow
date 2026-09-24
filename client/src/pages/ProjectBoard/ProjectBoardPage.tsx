@@ -54,14 +54,47 @@ type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
 
 type PriorityFilter = "ALL" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+function getStatusFilter(value: string | null): StatusFilter {
+  switch (value) {
+    case "TODO":
+    case "IN_PROGRESS":
+    case "DONE":
+      return value;
+
+    default:
+      return "ALL";
+  }
+}
+
+function getPriorityFilter(value: string | null): PriorityFilter {
+  switch (value) {
+    case "LOW":
+    case "MEDIUM":
+    case "HIGH":
+    case "URGENT":
+      return value;
+
+    default:
+      return "ALL";
+  }
+}
+
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
 
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const { accessToken, user } = useAuth();
+
   const linkedIssueId = searchParams.get("issue");
 
-  const { accessToken, user } = useAuth();
+  const searchText = searchParams.get("q") ?? "";
+
+  const statusFilter = getStatusFilter(searchParams.get("status"));
+
+  const priorityFilter = getPriorityFilter(searchParams.get("priority"));
+
+  const assigneeFilter = searchParams.get("assignee") ?? "ALL";
 
   const [issues, setIssues] = useState<Issue[]>([]);
 
@@ -94,14 +127,6 @@ function ProjectBoardPage() {
   const [deletingIssue, setDeletingIssue] = useState<Issue | null>(null);
 
   const [deleting, setDeleting] = useState(false);
-
-  const [searchText, setSearchText] = useState("");
-
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
-
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
-
-  const [assigneeFilter, setAssigneeFilter] = useState("ALL");
 
   const filteredIssues = useMemo(() => {
     const normalizedSearch = searchText.trim().toLowerCase();
@@ -202,14 +227,6 @@ function ProjectBoardPage() {
         setProject(projectData);
 
         setActivities(activityData);
-
-        if (linkedIssueId) {
-          const linkedIssue = issueData.find(
-            (issue) => issue.id === linkedIssueId,
-          );
-
-          setDiscussionIssue(linkedIssue ?? null);
-        }
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -230,7 +247,21 @@ function ProjectBoardPage() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, projectId, accessToken, linkedIssueId]);
+  }, [workspaceId, projectId, accessToken]);
+
+  useEffect(() => {
+    if (!linkedIssueId) {
+      setDiscussionIssue(null);
+
+      return;
+    }
+
+    const linkedIssue = issues.find((issue) => issue.id === linkedIssueId);
+
+    if (linkedIssue) {
+      setDiscussionIssue(linkedIssue);
+    }
+  }, [linkedIssueId, issues]);
 
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -257,6 +288,7 @@ function ProjectBoardPage() {
 
     function belongsToCurrentProject(payload: {
       workspaceId: string;
+
       projectId: string;
     }) {
       return (
@@ -301,7 +333,9 @@ function ProjectBoardPage() {
 
     function handlePresenceUpdated(payload: {
       workspaceId: string;
+
       projectId: string;
+
       users: PresenceUser[];
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -313,10 +347,15 @@ function ProjectBoardPage() {
 
     function handleIssueActivity(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issueId: string;
+
       activity: IssueActivityType;
+
       active: boolean;
+
       user: PresenceUser;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -353,7 +392,9 @@ function ProjectBoardPage() {
 
     function handleIssueCreated(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -369,7 +410,9 @@ function ProjectBoardPage() {
 
     function handleIssueUpdated(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -389,7 +432,9 @@ function ProjectBoardPage() {
 
     function handleIssueMoved(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -409,7 +454,9 @@ function ProjectBoardPage() {
 
     function handleIssueDeleted(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issueId: string;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -433,6 +480,16 @@ function ProjectBoardPage() {
       setDiscussionIssue((currentIssue) =>
         currentIssue?.id === payload.issueId ? null : currentIssue,
       );
+
+      if (linkedIssueId === payload.issueId) {
+        setSearchParams((currentParams) => {
+          const nextParams = new URLSearchParams(currentParams);
+
+          nextParams.delete("issue");
+
+          return nextParams;
+        });
+      }
 
       refreshActivitySoon();
     }
@@ -490,7 +547,62 @@ function ProjectBoardPage() {
 
       socket.off("issue:deleted", handleIssueDeleted);
     };
-  }, [workspaceId, projectId, accessToken, loadActivity]);
+  }, [
+    workspaceId,
+    projectId,
+    accessToken,
+    loadActivity,
+    linkedIssueId,
+    setSearchParams,
+  ]);
+
+  function setQueryParameter(key: string, value: string, defaultValue: string) {
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+
+      const trimmedValue = value.trim();
+
+      if (trimmedValue.length === 0 || value === defaultValue) {
+        nextParams.delete(key);
+      } else {
+        nextParams.set(key, value);
+      }
+
+      return nextParams;
+    });
+  }
+
+  function handleSearchChange(value: string) {
+    setQueryParameter("q", value, "");
+  }
+
+  function handleStatusChange(value: StatusFilter) {
+    setQueryParameter("status", value, "ALL");
+  }
+
+  function handlePriorityChange(value: PriorityFilter) {
+    setQueryParameter("priority", value, "ALL");
+  }
+
+  function handleAssigneeChange(value: string) {
+    setQueryParameter("assignee", value, "ALL");
+  }
+
+  function handleClearFilters() {
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+
+      nextParams.delete("q");
+
+      nextParams.delete("status");
+
+      nextParams.delete("priority");
+
+      nextParams.delete("assignee");
+
+      return nextParams;
+    });
+  }
 
   function emitIssueEvent(
     event: "issue:created" | "issue:updated" | "issue:moved" | "issue:deleted",
@@ -567,7 +679,11 @@ function ProjectBoardPage() {
     refreshActivitySoon();
   }
 
-  async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
+  async function handleUpdateIssue(
+    issueId: string,
+
+    input: UpdateIssueInput,
+  ) {
     if (!workspaceId || !projectId || !accessToken) {
       throw new Error("Unable to update issue");
     }
@@ -620,7 +736,9 @@ function ProjectBoardPage() {
 
   async function handleMoveIssue(
     issueId: string,
+
     status: IssueStatus,
+
     position: number,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -702,7 +820,13 @@ function ProjectBoardPage() {
       if (discussionIssue?.id === issueId) {
         setDiscussionIssue(null);
 
-        setSearchParams({});
+        setSearchParams((currentParams) => {
+          const nextParams = new URLSearchParams(currentParams);
+
+          nextParams.delete("issue");
+
+          return nextParams;
+        });
       }
 
       if (editingIssue?.id === issueId) {
@@ -782,8 +906,12 @@ function ProjectBoardPage() {
   function handleOpenComments(issue: Issue) {
     setDiscussionIssue(issue);
 
-    setSearchParams({
-      issue: issue.id,
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+
+      nextParams.set("issue", issue.id);
+
+      return nextParams;
     });
 
     setError(null);
@@ -792,7 +920,13 @@ function ProjectBoardPage() {
   function handleCloseComments() {
     setDiscussionIssue(null);
 
-    setSearchParams({});
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+
+      nextParams.delete("issue");
+
+      return nextParams;
+    });
   }
 
   function handleDragActivity(
@@ -801,16 +935,6 @@ function ProjectBoardPage() {
     active: boolean,
   ) {
     emitIssueActivity(issueId, "DRAGGING", active);
-  }
-
-  function handleClearFilters() {
-    setSearchText("");
-
-    setStatusFilter("ALL");
-
-    setPriorityFilter("ALL");
-
-    setAssigneeFilter("ALL");
   }
 
   const currentMembership = user
@@ -999,10 +1123,10 @@ function ProjectBoardPage() {
           members={members}
           filteredCount={filteredIssues.length}
           totalCount={issues.length}
-          onSearchChange={setSearchText}
-          onStatusChange={setStatusFilter}
-          onPriorityChange={setPriorityFilter}
-          onAssigneeChange={setAssigneeFilter}
+          onSearchChange={handleSearchChange}
+          onStatusChange={handleStatusChange}
+          onPriorityChange={handlePriorityChange}
+          onAssigneeChange={handleAssigneeChange}
           onClear={handleClearFilters}
         />
 
