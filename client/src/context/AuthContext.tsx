@@ -6,7 +6,7 @@ import {
   logoutUser,
   refreshSession,
   type User,
-} from "../../api/auth.ts";
+} from "../api/auth.ts";
 
 interface LoginCredentials {
   email: string;

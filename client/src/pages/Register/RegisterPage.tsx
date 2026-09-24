@@ -1,13 +1,7 @@
-import {
-  type FormEvent,
-  useState,
-} from "react";
-import {
-  Link,
-  useNavigate,
-} from "react-router";
+import { type FormEvent, useState } from "react";
+import { Link, useNavigate } from "react-router";
 
-import { registerUser } from "../../../api/auth.ts";
+import { registerUser } from "../../api/auth.ts";
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -59,9 +53,7 @@ function RegisterPage() {
 
       <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="name">
-            Name
-          </label>
+          <label htmlFor="name">Name</label>
 
           <input
             id="name"
@@ -74,9 +66,7 @@ function RegisterPage() {
         </div>
 
         <div>
-          <label htmlFor="email">
-            Email
-          </label>
+          <label htmlFor="email">Email</label>
 
           <input
             id="email"
@@ -89,9 +79,7 @@ function RegisterPage() {
         </div>
 
         <div>
-          <label htmlFor="password">
-            Password
-          </label>
+          <label htmlFor="password">Password</label>
 
           <input
             id="password"
@@ -105,42 +93,28 @@ function RegisterPage() {
         </div>
 
         <div>
-          <label htmlFor="confirmPassword">
-            Confirm password
-          </label>
+          <label htmlFor="confirmPassword">Confirm password</label>
 
           <input
             id="confirmPassword"
             name="confirmPassword"
             type="password"
             value={confirmPassword}
-            onChange={(event) =>
-              setConfirmPassword(event.target.value)
-            }
+            onChange={(event) => setConfirmPassword(event.target.value)}
             minLength={8}
             required
           />
         </div>
 
-        {error && (
-          <p role="alert">
-            {error}
-          </p>
-        )}
+        {error && <p role="alert">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-        >
+        <button type="submit" disabled={loading}>
           {loading ? "Creating account..." : "Create account"}
         </button>
       </form>
 
       <p>
-        Already have an account?{" "}
-        <Link to="/login">
-          Sign in
-        </Link>
+        Already have an account? <Link to="/login">Sign in</Link>
       </p>
     </main>
   );
