@@ -1,3 +1,7 @@
+import { CSS } from "@dnd-kit/utilities";
+
+import { useSortable } from "@dnd-kit/sortable";
+
 import type { Issue } from "../../api/issues";
 
 interface IssueCardProps {
@@ -5,8 +9,39 @@ interface IssueCardProps {
 }
 
 function IssueCard({ issue }: IssueCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: issue.id,
+    data: {
+      issue,
+      type: "issue",
+    },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   return (
-    <article className="rounded-xl border border-slate-700 bg-slate-800 p-4 shadow-sm">
+    <article
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`
+        cursor-grab rounded-xl border border-slate-700
+        bg-slate-800 p-4 shadow-sm
+        active:cursor-grabbing
+        ${isDragging ? "opacity-50" : ""}
+      `}
+    >
       <div className="mb-3 flex items-start justify-between gap-3">
         <h3 className="font-semibold text-white">{issue.title}</h3>
 

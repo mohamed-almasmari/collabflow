@@ -1,45 +1,36 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
-import {
-  useParams,
-} from "react-router";
+import { useParams } from "react-router";
 
 import {
   getIssues,
+  moveIssue,
   type Issue,
+  type IssueStatus,
 } from "../../api/issues";
 
-import KanbanBoard from "../../components/kanban/KanbanBoard.tsx"
+import KanbanBoard from "../../components/kanban/KanbanBoard.tsx";
 import { useAuth } from "../../hooks/useAuth";
 
 function ProjectBoardPage() {
-  const {
-    workspaceId,
-    projectId,
-  } = useParams();
+  const { workspaceId, projectId } = useParams();
 
   const { accessToken } = useAuth();
 
-  const [issues, setIssues] =
-    useState<Issue[]>([]);
+  const [issues, setIssues] = useState<Issue[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (
-      !workspaceId ||
-      !projectId ||
-      !accessToken
-    ) {
+    if (!workspaceId || !projectId || !accessToken) {
       return;
     }
+
+    const currentWorkspaceId = workspaceId;
+    const currentProjectId = projectId;
+    const currentAccessToken = accessToken;
 
     let cancelled = false;
 
@@ -49,9 +40,9 @@ function ProjectBoardPage() {
         setError(null);
 
         const data = await getIssues(
-          workspaceId!,
-          projectId!,
-          accessToken!,
+          currentWorkspaceId,
+          currentProjectId,
+          currentAccessToken,
         );
 
         if (!cancelled) {
@@ -60,9 +51,7 @@ function ProjectBoardPage() {
       } catch (error) {
         if (!cancelled) {
           setError(
-            error instanceof Error
-              ? error.message
-              : "Unable to load issues",
+            error instanceof Error ? error.message : "Unable to load issues",
           );
         }
       } finally {
@@ -77,18 +66,10 @@ function ProjectBoardPage() {
     return () => {
       cancelled = true;
     };
-  }, [
-    workspaceId,
-    projectId,
-    accessToken,
-  ]);
+  }, [workspaceId, projectId, accessToken]);
 
   if (loading) {
-    return (
-      <div className="p-8 text-slate-300">
-        Loading board...
-      </div>
-    );
+    return <div className="p-8 text-slate-300">Loading board...</div>;
   }
 
   if (error) {
@@ -100,7 +81,54 @@ function ProjectBoardPage() {
       </div>
     );
   }
+  async function handleMoveIssue(
+    issueId: string,
+    status: IssueStatus,
+    position: number,
+  ) {
+    if (!workspaceId || !projectId || !accessToken) {
+      return;
+    }
 
+    const previousIssues = issues;
+
+    setIssues((currentIssues) =>
+      currentIssues.map((issue) =>
+        issue.id === issueId
+          ? {
+              ...issue,
+              status,
+              position,
+            }
+          : issue,
+      ),
+    );
+
+    try {
+      await moveIssue(
+        workspaceId,
+        projectId,
+        issueId,
+        {
+          status,
+          position,
+        },
+        accessToken,
+      );
+
+      const refreshedIssues = await getIssues(
+        workspaceId,
+        projectId,
+        accessToken,
+      );
+
+      setIssues(refreshedIssues);
+    } catch (error) {
+      setIssues(previousIssues);
+
+      setError(error instanceof Error ? error.message : "Unable to move issue");
+    }
+  }
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-8">
       <div className="mx-auto max-w-7xl">
@@ -109,19 +137,16 @@ function ProjectBoardPage() {
             Project Board
           </p>
 
-          <h1 className="text-3xl font-bold text-white">
-            Kanban Board
-          </h1>
+          <h1 className="text-3xl font-bold text-white">Kanban Board</h1>
 
           <p className="mt-2 text-slate-400">
             Track issues across your project workflow.
           </p>
         </header>
 
-        <KanbanBoard issues={issues} />
+        <KanbanBoard issues={issues} onMoveIssue={handleMoveIssue} />
       </div>
     </main>
   );
 }
-
 export default ProjectBoardPage;
