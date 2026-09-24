@@ -6,13 +6,17 @@ import {
   createIssue,
   getIssues,
   moveIssue,
+  updateIssue,
   type CreateIssueInput,
   type Issue,
   type IssueStatus,
+  type UpdateIssueInput,
 } from "../../api/issues";
 
 import CreateIssueForm from "../../components/kanban/CreateIssueForm.tsx";
-import KanbanBoard from "../../components/kanban/KanbanBoard.tsx";
+import EditIssueForm from "../../components/kanban/EditIssueForm";
+import KanbanBoard from "../../components/kanban/KanbanBoard";
+
 import { useAuth } from "../../hooks/useAuth";
 
 function ProjectBoardPage() {
@@ -27,6 +31,8 @@ function ProjectBoardPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
+
+  const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
 
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -92,6 +98,28 @@ function ProjectBoardPage() {
     setShowCreateForm(false);
   }
 
+  async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
+    if (!workspaceId || !projectId || !accessToken) {
+      throw new Error("Unable to update issue");
+    }
+
+    const updatedIssue = await updateIssue(
+      workspaceId,
+      projectId,
+      issueId,
+      input,
+      accessToken,
+    );
+
+    setIssues((currentIssues) =>
+      currentIssues.map((issue) =>
+        issue.id === updatedIssue.id ? updatedIssue : issue,
+      ),
+    );
+
+    setEditingIssue(null);
+  }
+
   async function handleMoveIssue(
     issueId: string,
     status: IssueStatus,
@@ -143,6 +171,18 @@ function ProjectBoardPage() {
     }
   }
 
+  function handleStartCreate() {
+    setEditingIssue(null);
+    setShowCreateForm(true);
+    setError(null);
+  }
+
+  function handleStartEdit(issue: Issue) {
+    setShowCreateForm(false);
+    setEditingIssue(issue);
+    setError(null);
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-950 p-8">
@@ -180,10 +220,7 @@ function ProjectBoardPage() {
 
             <button
               type="button"
-              onClick={() => {
-                setShowCreateForm(true);
-                setError(null);
-              }}
+              onClick={handleStartCreate}
               className="self-start rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 sm:self-auto"
             >
               New Issue
@@ -206,7 +243,21 @@ function ProjectBoardPage() {
           </div>
         )}
 
-        <KanbanBoard issues={issues} onMoveIssue={handleMoveIssue} />
+        {editingIssue && (
+          <div className="mb-6">
+            <EditIssueForm
+              issue={editingIssue}
+              onSave={handleUpdateIssue}
+              onCancel={() => setEditingIssue(null)}
+            />
+          </div>
+        )}
+
+        <KanbanBoard
+          issues={issues}
+          onMoveIssue={handleMoveIssue}
+          onEditIssue={handleStartEdit}
+        />
       </div>
     </main>
   );

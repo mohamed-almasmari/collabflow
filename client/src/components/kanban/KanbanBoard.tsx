@@ -19,11 +19,13 @@ interface KanbanBoardProps {
     status: IssueStatus,
     position: number,
   ) => Promise<void>;
+
+  onEditIssue: (issue: Issue) => void;
 }
 
 const statuses: IssueStatus[] = ["TODO", "IN_PROGRESS", "DONE"];
 
-function KanbanBoard({ issues, onMoveIssue }: KanbanBoardProps) {
+function KanbanBoard({ issues, onMoveIssue, onEditIssue }: KanbanBoardProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -94,15 +96,26 @@ function KanbanBoard({ issues, onMoveIssue }: KanbanBoardProps) {
       }}
     >
       <div className="grid gap-5 lg:grid-cols-3">
-        <KanbanColumn title="To Do" status="TODO" issues={issues} />
+        <KanbanColumn
+          title="To Do"
+          status="TODO"
+          issues={issues}
+          onEditIssue={onEditIssue}
+        />
 
         <KanbanColumn
           title="In Progress"
           status="IN_PROGRESS"
           issues={issues}
+          onEditIssue={onEditIssue}
         />
 
-        <KanbanColumn title="Done" status="DONE" issues={issues} />
+        <KanbanColumn
+          title="Done"
+          status="DONE"
+          issues={issues}
+          onEditIssue={onEditIssue}
+        />
       </div>
     </DndContext>
   );

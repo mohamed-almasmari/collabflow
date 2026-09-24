@@ -13,9 +13,15 @@ interface KanbanColumnProps {
   title: string;
   status: IssueStatus;
   issues: Issue[];
+  onEditIssue: (issue: Issue) => void;
 }
 
-function KanbanColumn({ title, status, issues }: KanbanColumnProps) {
+function KanbanColumn({
+  title,
+  status,
+  issues,
+  onEditIssue,
+}: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
     data: {
@@ -55,7 +61,7 @@ function KanbanColumn({ title, status, issues }: KanbanColumnProps) {
             </div>
           ) : (
             columnIssues.map((issue) => (
-              <IssueCard key={issue.id} issue={issue} />
+              <IssueCard key={issue.id} issue={issue} onEdit={onEditIssue} />
             ))
           )}
         </div>

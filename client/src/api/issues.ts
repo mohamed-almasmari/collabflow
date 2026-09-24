@@ -141,3 +141,46 @@ export async function createIssue(
 
   return data.issue;
 }
+export interface UpdateIssueInput {
+  title?: string;
+  description?: string | null;
+  status?: IssueStatus;
+  priority?: IssuePriority;
+  assigneeId?: string | null;
+}
+
+interface UpdateIssueResponse {
+  message: string;
+  issue: Issue;
+}
+
+export async function updateIssue(
+  workspaceId: string,
+  projectId: string,
+  issueId: string,
+  input: UpdateIssueInput,
+  accessToken: string,
+): Promise<Issue> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues/${issueId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: "include",
+      body: JSON.stringify(input),
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to update issue");
+  }
+
+  const data: UpdateIssueResponse = await response.json();
+
+  return data.issue;
+}

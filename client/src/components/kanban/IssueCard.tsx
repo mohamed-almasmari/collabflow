@@ -6,9 +6,10 @@ import type { Issue } from "../../api/issues";
 
 interface IssueCardProps {
   issue: Issue;
+  onEdit: (issue: Issue) => void;
 }
 
-function IssueCard({ issue }: IssueCardProps) {
+function IssueCard({ issue, onEdit }: IssueCardProps) {
   const {
     attributes,
     listeners,
@@ -61,6 +62,19 @@ function IssueCard({ issue }: IssueCardProps) {
 
         <span>#{issue.position + 1}</span>
       </div>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onEdit(issue);
+        }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
+        className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
+      >
+        Edit
+      </button>
     </article>
   );
 }
