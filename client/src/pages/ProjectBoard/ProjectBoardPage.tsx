@@ -14,7 +14,13 @@ import {
   type UpdateIssueInput,
 } from "../../api/issues";
 
-import { getWorkspaceById, type WorkspaceMember } from "../../api/workspaces";
+import { getProjectById, type Project } from "../../api/projects";
+
+import {
+  getWorkspaceById,
+  type Workspace,
+  type WorkspaceMember,
+} from "../../api/workspaces";
 
 import CreateIssueForm from "../../components/kanban/CreateIssueForm";
 import EditIssueForm from "../../components/kanban/EditIssueForm";
@@ -30,6 +36,10 @@ function ProjectBoardPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
 
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
+
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+
+  const [project, setProject] = useState<Project | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -61,15 +71,26 @@ function ProjectBoardPage() {
         setLoading(true);
         setError(null);
 
-        const [issueData, workspaceData] = await Promise.all([
+        const [issueData, workspaceData, projectData] = await Promise.all([
           getIssues(currentWorkspaceId, currentProjectId, currentAccessToken),
 
           getWorkspaceById(currentWorkspaceId, currentAccessToken),
+
+          getProjectById(
+            currentWorkspaceId,
+            currentProjectId,
+            currentAccessToken,
+          ),
         ]);
 
         if (!cancelled) {
           setIssues(issueData);
+
           setMembers(workspaceData.members);
+
+          setWorkspace(workspaceData);
+
+          setProject(projectData);
         }
       } catch (error) {
         if (!cancelled) {
@@ -95,9 +116,7 @@ function ProjectBoardPage() {
 
   async function handleCreateIssue(input: CreateIssueInput) {
     if (!workspaceId || !projectId || !accessToken) {
-      throw new Error(
-        "Unable to create issue because project information is missing",
-      );
+      throw new Error("Unable to create issue");
     }
 
     const newIssue = await createIssue(
@@ -260,24 +279,56 @@ function ProjectBoardPage() {
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-8">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
-                Project Board
+                {workspace?.name ?? "Workspace"}
               </p>
 
-              <h1 className="text-3xl font-bold text-white">Kanban Board</h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-bold text-white">
+                  {project?.name ?? "Kanban Board"}
+                </h1>
 
-              <p className="mt-2 text-slate-400">
-                Track issues across your project workflow.
+                {project && (
+                  <span
+                    className={`
+                      rounded-full border px-3 py-1
+                      text-xs font-semibold
+                      ${
+                        project.status === "ACTIVE"
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                          : "border-slate-600 bg-slate-800 text-slate-400"
+                      }
+                    `}
+                  >
+                    {project.status}
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-2 max-w-2xl text-slate-400">
+                {project?.description ??
+                  "Track issues across your project workflow."}
               </p>
+
+              <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
+                <span>
+                  {members.length} {members.length === 1 ? "member" : "members"}
+                </span>
+
+                <span>
+                  {issues.length} {issues.length === 1 ? "issue" : "issues"}
+                </span>
+              </div>
             </div>
 
             <button
               type="button"
               onClick={handleStartCreate}
-              className="self-start rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 sm:self-auto"
+              disabled={project?.status === "ARCHIVED"}
+              className="self-start rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
             >
               New Issue
             </button>
@@ -332,7 +383,7 @@ function ProjectBoardPage() {
                 type="button"
                 onClick={() => setDeletingIssue(null)}
                 disabled={deleting}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 disabled:opacity-50"
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -343,7 +394,7 @@ function ProjectBoardPage() {
                   void handleDeleteIssue();
                 }}
                 disabled={deleting}
-                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-50"
+                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-400 disabled:opacity-50"
               >
                 {deleting ? "Deleting..." : "Delete Issue"}
               </button>

@@ -13,7 +13,9 @@ interface KanbanColumnProps {
   title: string;
   status: IssueStatus;
   issues: Issue[];
+
   onEditIssue: (issue: Issue) => void;
+
   onDeleteIssue: (issue: Issue) => void;
 }
 
@@ -40,26 +42,29 @@ function KanbanColumn({
     <section
       ref={setNodeRef}
       className={`
-        min-w-0 rounded-2xl border bg-slate-900/70 p-4
-        ${isOver ? "border-cyan-500" : "border-slate-800"}
+        min-w-0 rounded-2xl border
+        bg-slate-900/70 p-4 transition
+        ${isOver ? "border-cyan-500 bg-slate-900" : "border-slate-800"}
       `}
     >
       <header className="mb-4 flex items-center justify-between">
-        <h2 className="font-semibold text-white">{title}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold text-white">{title}</h2>
 
-        <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300">
-          {columnIssues.length}
-        </span>
+          <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300">
+            {columnIssues.length}
+          </span>
+        </div>
       </header>
 
       <SortableContext
         items={columnIssues.map((issue) => issue.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="min-h-24 space-y-3">
+        <div className="min-h-40 space-y-3">
           {columnIssues.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-500">
-              Drop issue here
+            <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center">
+              <p className="text-sm text-slate-500">Drop issue here</p>
             </div>
           ) : (
             columnIssues.map((issue) => (
