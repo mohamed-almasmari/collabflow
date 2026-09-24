@@ -2,6 +2,12 @@ import { io, type Socket } from "socket.io-client";
 
 import type { Issue } from "../api/issues";
 
+export interface PresenceUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface ProjectRoomPayload {
   workspaceId: string;
   projectId: string;
@@ -19,6 +25,10 @@ interface IssueDeletedPayload extends ProjectRoomPayload {
   issueId: string;
 }
 
+interface PresencePayload extends ProjectRoomPayload {
+  users: PresenceUser[];
+}
+
 interface SocketErrorPayload {
   message: string;
 }
@@ -31,6 +41,8 @@ interface ServerToClientEvents {
   "issue:moved": (payload: IssueRealtimePayload) => void;
 
   "issue:deleted": (payload: IssueDeletedPayload) => void;
+
+  "presence:updated": (payload: PresencePayload) => void;
 
   "socket:error": (payload: SocketErrorPayload) => void;
 }

@@ -51,6 +51,16 @@ interface IssueDeletedPayload extends ProjectRoomPayload {
   issueId: string;
 }
 
+interface PresenceUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface PresencePayload extends ProjectRoomPayload {
+  users: PresenceUser[];
+}
+
 interface SocketErrorPayload {
   message: string;
 }
@@ -63,6 +73,8 @@ interface ServerToClientEvents {
   "issue:moved": (payload: IssueRealtimePayload) => void;
 
   "issue:deleted": (payload: IssueDeletedPayload) => void;
+
+  "presence:updated": (payload: PresencePayload) => void;
 
   "socket:error": (payload: SocketErrorPayload) => void;
 }
@@ -83,6 +95,10 @@ interface ClientToServerEvents {
 
 interface SocketData {
   userId: string;
+  name: string;
+  email: string;
+
+  joinedProjects: ProjectRoomPayload[];
 }
 
 type CollabFlowSocket = Socket<
@@ -111,6 +127,17 @@ function isValidIssuePayload(payload: IssueMutationPayload) {
     isValidProjectPayload(payload) &&
     typeof payload.issueId === "string" &&
     payload.issueId.trim(),
+  );
+}
+
+function projectAlreadyJoined(
+  projects: ProjectRoomPayload[],
+  workspaceId: string,
+  projectId: string,
+) {
+  return projects.some(
+    (project) =>
+      project.workspaceId === workspaceId && project.projectId === projectId,
   );
 }
 
@@ -235,7 +262,7 @@ async function getRealtimeIssue(
   };
 }
 
-async function isAuthorizedRoom(
+function isAuthorizedRoom(
   socket: CollabFlowSocket,
   workspaceId: string,
   projectId: string,
@@ -260,6 +287,38 @@ export function initializeSocketServer(httpServer: HttpServer) {
     },
   });
 
+  async function emitProjectPresence(workspaceId: string, projectId: string) {
+    const room = getProjectRoom(workspaceId, projectId);
+
+    const sockets = await io.in(room).fetchSockets();
+
+    const uniqueUsers = new Map<string, PresenceUser>();
+
+    for (const connectedSocket of sockets) {
+      const { userId, name, email } = connectedSocket.data;
+
+      if (!userId || uniqueUsers.has(userId)) {
+        continue;
+      }
+
+      uniqueUsers.set(userId, {
+        id: userId,
+        name,
+        email,
+      });
+    }
+
+    const users = Array.from(uniqueUsers.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+
+    io.to(room).emit("presence:updated", {
+      workspaceId,
+      projectId,
+      users,
+    });
+  }
+
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.accessToken;
@@ -279,6 +338,8 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
         select: {
           id: true,
+          name: true,
+          email: true,
         },
       });
 
@@ -290,6 +351,12 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
       socket.data.userId = user.id;
 
+      socket.data.name = user.name;
+
+      socket.data.email = user.email;
+
+      socket.data.joinedProjects = [];
+
       next();
     } catch {
       next(new Error("Invalid or expired authentication token"));
@@ -298,6 +365,8 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
   io.on("connection", (socket: CollabFlowSocket) => {
     console.log(`Socket connected: ${socket.id} user=${socket.data.userId}`);
+
+    let disconnectedProjects: ProjectRoomPayload[] = [];
 
     socket.on("project:join", async (payload) => {
       if (!isValidProjectPayload(payload)) {
@@ -327,7 +396,23 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
         await socket.join(room);
 
+        if (
+          !projectAlreadyJoined(
+            socket.data.joinedProjects,
+            payload.workspaceId,
+            payload.projectId,
+          )
+        ) {
+          socket.data.joinedProjects.push({
+            workspaceId: payload.workspaceId,
+
+            projectId: payload.projectId,
+          });
+        }
+
         console.log(`Socket ${socket.id} joined ${room}`);
+
+        await emitProjectPresence(payload.workspaceId, payload.projectId);
       } catch (error) {
         console.error("Unable to join project room:", error);
 
@@ -345,6 +430,16 @@ export function initializeSocketServer(httpServer: HttpServer) {
       const room = getProjectRoom(payload.workspaceId, payload.projectId);
 
       await socket.leave(room);
+
+      socket.data.joinedProjects = socket.data.joinedProjects.filter(
+        (project) =>
+          !(
+            project.workspaceId === payload.workspaceId &&
+            project.projectId === payload.projectId
+          ),
+      );
+
+      await emitProjectPresence(payload.workspaceId, payload.projectId);
     });
 
     socket.on("issue:created", async (payload) => {
@@ -352,13 +447,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      if (
-        !(await isAuthorizedRoom(
-          socket,
-          payload.workspaceId,
-          payload.projectId,
-        ))
-      ) {
+      if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
         socket.emit("socket:error", {
           message: "You are not authorized for this project room",
         });
@@ -392,13 +481,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      if (
-        !(await isAuthorizedRoom(
-          socket,
-          payload.workspaceId,
-          payload.projectId,
-        ))
-      ) {
+      if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
         return;
       }
 
@@ -428,13 +511,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      if (
-        !(await isAuthorizedRoom(
-          socket,
-          payload.workspaceId,
-          payload.projectId,
-        ))
-      ) {
+      if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
         return;
       }
 
@@ -459,18 +536,12 @@ export function initializeSocketServer(httpServer: HttpServer) {
       });
     });
 
-    socket.on("issue:deleted", async (payload) => {
+    socket.on("issue:deleted", (payload) => {
       if (!isValidIssuePayload(payload)) {
         return;
       }
 
-      if (
-        !(await isAuthorizedRoom(
-          socket,
-          payload.workspaceId,
-          payload.projectId,
-        ))
-      ) {
+      if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
         return;
       }
 
@@ -485,8 +556,16 @@ export function initializeSocketServer(httpServer: HttpServer) {
       });
     });
 
+    socket.on("disconnecting", () => {
+      disconnectedProjects = [...socket.data.joinedProjects];
+    });
+
     socket.on("disconnect", (reason) => {
       console.log(`Socket disconnected: ${socket.id} (${reason})`);
+
+      for (const project of disconnectedProjects) {
+        void emitProjectPresence(project.workspaceId, project.projectId);
+      }
     });
   });
 

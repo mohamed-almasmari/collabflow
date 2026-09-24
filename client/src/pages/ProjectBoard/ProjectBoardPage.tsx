@@ -25,10 +25,11 @@ import {
 import CreateIssueForm from "../../components/kanban/CreateIssueForm";
 import EditIssueForm from "../../components/kanban/EditIssueForm";
 import KanbanBoard from "../../components/kanban/KanbanBoard";
+import ProjectPresence from "../../components/kanban/ProjectPresence";
 
 import { useAuth } from "../../hooks/useAuth";
 
-import { getSocket } from "../../socket/socket";
+import { getSocket, type PresenceUser } from "../../socket/socket";
 
 import {
   addRealtimeIssue,
@@ -49,6 +50,8 @@ function ProjectBoardPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   const [project, setProject] = useState<Project | null>(null);
+
+  const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -131,6 +134,8 @@ function ProjectBoardPage() {
     if (!workspaceId || !projectId || !accessToken) {
       setRealtimeConnected(false);
 
+      setPresenceUsers([]);
+
       return;
     }
 
@@ -164,16 +169,32 @@ function ProjectBoardPage() {
 
     function handleDisconnect() {
       setRealtimeConnected(false);
+
+      setPresenceUsers([]);
     }
 
     function handleConnectError(error: Error) {
       setRealtimeConnected(false);
+
+      setPresenceUsers([]);
 
       setError(error.message || "Unable to connect to real-time server");
     }
 
     function handleSocketError(payload: { message: string }) {
       setError(payload.message);
+    }
+
+    function handlePresenceUpdated(payload: {
+      workspaceId: string;
+      projectId: string;
+      users: PresenceUser[];
+    }) {
+      if (!belongsToCurrentProject(payload)) {
+        return;
+      }
+
+      setPresenceUsers(payload.users);
     }
 
     function handleIssueCreated(payload: {
@@ -240,6 +261,8 @@ function ProjectBoardPage() {
 
     socket.on("socket:error", handleSocketError);
 
+    socket.on("presence:updated", handlePresenceUpdated);
+
     socket.on("issue:created", handleIssueCreated);
 
     socket.on("issue:updated", handleIssueUpdated);
@@ -257,6 +280,8 @@ function ProjectBoardPage() {
         socket.emit("project:leave", roomPayload);
       }
 
+      setPresenceUsers([]);
+
       socket.off("connect", joinProjectRoom);
 
       socket.off("disconnect", handleDisconnect);
@@ -264,6 +289,8 @@ function ProjectBoardPage() {
       socket.off("connect_error", handleConnectError);
 
       socket.off("socket:error", handleSocketError);
+
+      socket.off("presence:updated", handlePresenceUpdated);
 
       socket.off("issue:created", handleIssueCreated);
 
@@ -496,24 +523,30 @@ function ProjectBoardPage() {
                   "Track issues across your project workflow."}
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
-                <span>
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <span className="text-sm text-slate-500">
                   {members.length} {members.length === 1 ? "member" : "members"}
                 </span>
 
-                <span>
+                <span className="text-sm text-slate-500">
                   {issues.length} {issues.length === 1 ? "issue" : "issues"}
                 </span>
 
                 <span
                   className={
-                    realtimeConnected ? "text-emerald-400" : "text-amber-400"
+                    realtimeConnected
+                      ? "text-sm text-emerald-400"
+                      : "text-sm text-amber-400"
                   }
                 >
                   {realtimeConnected
                     ? "Real-time connected"
                     : "Real-time disconnected"}
                 </span>
+              </div>
+
+              <div className="mt-4">
+                <ProjectPresence users={presenceUsers} />
               </div>
             </div>
 
