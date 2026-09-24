@@ -4,6 +4,13 @@ type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
 
 type PriorityFilter = "ALL" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+type SortOption =
+  | "BOARD"
+  | "PRIORITY"
+  | "UPDATED_DESC"
+  | "UPDATED_ASC"
+  | "TITLE";
+
 interface BoardFiltersProps {
   searchText: string;
 
@@ -12,6 +19,10 @@ interface BoardFiltersProps {
   priorityFilter: PriorityFilter;
 
   assigneeFilter: string;
+
+  sortOption: SortOption;
+
+  myIssuesOnly: boolean;
 
   members: WorkspaceMember[];
 
@@ -27,6 +38,10 @@ interface BoardFiltersProps {
 
   onAssigneeChange: (value: string) => void;
 
+  onSortChange: (value: SortOption) => void;
+
+  onMyIssuesChange: (value: boolean) => void;
+
   onClear: () => void;
 }
 
@@ -35,6 +50,8 @@ function BoardFilters({
   statusFilter,
   priorityFilter,
   assigneeFilter,
+  sortOption,
+  myIssuesOnly,
   members,
   filteredCount,
   totalCount,
@@ -42,13 +59,17 @@ function BoardFilters({
   onStatusChange,
   onPriorityChange,
   onAssigneeChange,
+  onSortChange,
+  onMyIssuesChange,
   onClear,
 }: BoardFiltersProps) {
   const hasFilters =
     searchText.trim().length > 0 ||
     statusFilter !== "ALL" ||
     priorityFilter !== "ALL" ||
-    assigneeFilter !== "ALL";
+    assigneeFilter !== "ALL" ||
+    sortOption !== "BOARD" ||
+    myIssuesOnly;
 
   return (
     <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
@@ -75,7 +96,7 @@ function BoardFilters({
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div>
           <label
             htmlFor="issue-search"
@@ -173,6 +194,53 @@ function BoardFilters({
             ))}
           </select>
         </div>
+
+        <div>
+          <label
+            htmlFor="sort-filter"
+            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Sort
+          </label>
+
+          <select
+            id="sort-filter"
+            value={sortOption}
+            onChange={(event) => onSortChange(event.target.value as SortOption)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
+          >
+            <option value="BOARD">Board order</option>
+
+            <option value="PRIORITY">Priority</option>
+
+            <option value="UPDATED_DESC">Recently updated</option>
+
+            <option value="UPDATED_ASC">Oldest updated</option>
+
+            <option value="TITLE">Title A–Z</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-slate-800 pt-4">
+        <label className="inline-flex cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            checked={myIssuesOnly}
+            onChange={(event) => onMyIssuesChange(event.target.checked)}
+            className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+          />
+
+          <div>
+            <span className="text-sm font-medium text-slate-200">
+              My Issues
+            </span>
+
+            <p className="text-xs text-slate-500">
+              Only show issues assigned to me
+            </p>
+          </div>
+        </label>
       </div>
     </section>
   );

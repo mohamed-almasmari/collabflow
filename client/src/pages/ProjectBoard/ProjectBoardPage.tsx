@@ -54,6 +54,13 @@ type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
 
 type PriorityFilter = "ALL" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+type SortOption =
+  | "BOARD"
+  | "PRIORITY"
+  | "UPDATED_DESC"
+  | "UPDATED_ASC"
+  | "TITLE";
+
 function getStatusFilter(value: string | null): StatusFilter {
   switch (value) {
     case "TODO":
@@ -79,6 +86,26 @@ function getPriorityFilter(value: string | null): PriorityFilter {
   }
 }
 
+function getSortOption(value: string | null): SortOption {
+  switch (value) {
+    case "PRIORITY":
+    case "UPDATED_DESC":
+    case "UPDATED_ASC":
+    case "TITLE":
+      return value;
+
+    default:
+      return "BOARD";
+  }
+}
+
+const priorityOrder = {
+  URGENT: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3,
+} as const;
+
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
 
@@ -95,6 +122,10 @@ function ProjectBoardPage() {
   const priorityFilter = getPriorityFilter(searchParams.get("priority"));
 
   const assigneeFilter = searchParams.get("assignee") ?? "ALL";
+
+  const sortOption = getSortOption(searchParams.get("sort"));
+
+  const myIssuesOnly = searchParams.get("mine") === "true";
 
   const [issues, setIssues] = useState<Issue[]>([]);
 
@@ -131,7 +162,7 @@ function ProjectBoardPage() {
   const filteredIssues = useMemo(() => {
     const normalizedSearch = searchText.trim().toLowerCase();
 
-    return issues.filter((issue) => {
+    const filtered = issues.filter((issue) => {
       const matchesSearch =
         normalizedSearch.length === 0 ||
         issue.title.toLowerCase().includes(normalizedSearch) ||
@@ -148,11 +179,60 @@ function ProjectBoardPage() {
         (assigneeFilter === "UNASSIGNED" && !issue.assigneeId) ||
         issue.assigneeId === assigneeFilter;
 
+      const matchesMine =
+        !myIssuesOnly || (Boolean(user?.id) && issue.assigneeId === user?.id);
+
       return (
-        matchesSearch && matchesStatus && matchesPriority && matchesAssignee
+        matchesSearch &&
+        matchesStatus &&
+        matchesPriority &&
+        matchesAssignee &&
+        matchesMine
       );
     });
-  }, [issues, searchText, statusFilter, priorityFilter, assigneeFilter]);
+
+    return [...filtered].sort((firstIssue, secondIssue) => {
+      switch (sortOption) {
+        case "PRIORITY":
+          return (
+            priorityOrder[firstIssue.priority] -
+            priorityOrder[secondIssue.priority]
+          );
+
+        case "UPDATED_DESC":
+          return (
+            new Date(secondIssue.updatedAt).getTime() -
+            new Date(firstIssue.updatedAt).getTime()
+          );
+
+        case "UPDATED_ASC":
+          return (
+            new Date(firstIssue.updatedAt).getTime() -
+            new Date(secondIssue.updatedAt).getTime()
+          );
+
+        case "TITLE":
+          return firstIssue.title.localeCompare(secondIssue.title);
+
+        case "BOARD":
+        default:
+          if (firstIssue.status === secondIssue.status) {
+            return firstIssue.position - secondIssue.position;
+          }
+
+          return 0;
+      }
+    });
+  }, [
+    issues,
+    searchText,
+    statusFilter,
+    priorityFilter,
+    assigneeFilter,
+    sortOption,
+    myIssuesOnly,
+    user?.id,
+  ]);
 
   const loadActivity = useCallback(async () => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -588,6 +668,24 @@ function ProjectBoardPage() {
     setQueryParameter("assignee", value, "ALL");
   }
 
+  function handleSortChange(value: SortOption) {
+    setQueryParameter("sort", value, "BOARD");
+  }
+
+  function handleMyIssuesChange(value: boolean) {
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+
+      if (value) {
+        nextParams.set("mine", "true");
+      } else {
+        nextParams.delete("mine");
+      }
+
+      return nextParams;
+    });
+  }
+
   function handleClearFilters() {
     setSearchParams((currentParams) => {
       const nextParams = new URLSearchParams(currentParams);
@@ -599,6 +697,10 @@ function ProjectBoardPage() {
       nextParams.delete("priority");
 
       nextParams.delete("assignee");
+
+      nextParams.delete("sort");
+
+      nextParams.delete("mine");
 
       return nextParams;
     });
@@ -1120,6 +1222,8 @@ function ProjectBoardPage() {
           statusFilter={statusFilter}
           priorityFilter={priorityFilter}
           assigneeFilter={assigneeFilter}
+          sortOption={sortOption}
+          myIssuesOnly={myIssuesOnly}
           members={members}
           filteredCount={filteredIssues.length}
           totalCount={issues.length}
@@ -1127,6 +1231,8 @@ function ProjectBoardPage() {
           onStatusChange={handleStatusChange}
           onPriorityChange={handlePriorityChange}
           onAssigneeChange={handleAssigneeChange}
+          onSortChange={handleSortChange}
+          onMyIssuesChange={handleMyIssuesChange}
           onClear={handleClearFilters}
         />
 
