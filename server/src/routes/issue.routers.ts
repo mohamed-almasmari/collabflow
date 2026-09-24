@@ -15,6 +15,8 @@ import { recordIssueActivity } from "../middleware/issueActivity.middleware.js";
 
 import { requireCurrentIssueVersion } from "../middleware/issueConflict.middleware.js";
 
+import commentRoutes from "./comment.routes.js";
+
 const router = Router({
   mergeParams: true,
 });
@@ -22,6 +24,8 @@ const router = Router({
 router.get("/", requireAuth, getIssues);
 
 router.post("/", requireAuth, recordIssueActivity("CREATED"), createIssue);
+
+router.use("/:issueId/comments", commentRoutes);
 
 router.patch(
   "/:issueId/move",

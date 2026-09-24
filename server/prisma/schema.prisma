@@ -47,6 +47,8 @@ model User {
 
   createdIssues  Issue[] @relation("IssueCreator")
   assignedIssues Issue[] @relation("IssueAssignee")
+
+  comments Comment[]
 }
 
 model RefreshSession {
@@ -131,11 +133,30 @@ model Issue {
   createdBy User    @relation("IssueCreator", fields: [createdById], references: [id])
   assignee  User?   @relation("IssueAssignee", fields: [assigneeId], references: [id])
 
+  comments Comment[]
+
   @@index([projectId])
   @@index([createdById])
   @@index([assigneeId])
   @@index([status])
   @@index([projectId, status, position])
+}
+
+model Comment {
+  id       String @id @default(uuid())
+  body     String
+  issueId  String
+  authorId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([authorId])
+  @@index([issueId, createdAt])
 }
 
 model ActivityLog {
