@@ -7,6 +7,7 @@ import cors from "cors";
 import express from "express";
 
 import authRoutes from "./routes/auth.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 import workspaceRoutes from "./routes/workspace.routes.js";
 
 import { initializeSocketServer } from "./socket/socket.js";
@@ -20,6 +21,7 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
 app.use(
   cors({
     origin: CLIENT_ORIGIN,
+
     credentials: true,
   }),
 );
@@ -31,6 +33,7 @@ app.use(cookieParser());
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
+
     message: "CollabFlow API is running",
   });
 });
@@ -38,6 +41,8 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 
 app.use("/api/workspaces", workspaceRoutes);
+
+app.use("/api/notifications", notificationRoutes);
 
 const httpServer = createServer(app);
 

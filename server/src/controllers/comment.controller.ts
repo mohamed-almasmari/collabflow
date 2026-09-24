@@ -28,6 +28,32 @@ function getCommentBody(value: unknown): string | null {
   return body;
 }
 
+function getMentionedUserIds(value: unknown): string[] | null {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  if (value.length > 20) {
+    return null;
+  }
+
+  const userIds: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== "string" || item.trim().length === 0) {
+      return null;
+    }
+
+    userIds.push(item.trim());
+  }
+
+  return [...new Set(userIds)];
+}
+
 async function getIssueAccess(
   userId: string,
   workspaceId: string,
@@ -58,6 +84,7 @@ async function getIssueAccess(
 
       project: {
         id: projectId,
+
         workspaceId,
       },
     },
@@ -131,7 +158,9 @@ export async function getComments(req: AuthenticatedRequest, res: Response) {
         author: {
           select: {
             id: true,
+
             name: true,
+
             email: true,
           },
         },
@@ -186,6 +215,17 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
       return;
     }
 
+    const mentionedUserIds = getMentionedUserIds(req.body?.mentionedUserIds);
+
+    if (mentionedUserIds === null) {
+      res.status(400).json({
+        message:
+          "mentionedUserIds must be an array containing no more than 20 user IDs",
+      });
+
+      return;
+    }
+
     const access = await getIssueAccess(
       userId,
       workspaceId,
@@ -201,22 +241,75 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
       return;
     }
 
-    const comment = await prisma.comment.create({
-      data: {
-        body,
-        issueId,
-        authorId: userId,
-      },
+    const requestedRecipients = mentionedUserIds.filter(
+      (recipientId) => recipientId !== userId,
+    );
 
-      include: {
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    const validMembers =
+      requestedRecipients.length > 0
+        ? await prisma.workspaceMember.findMany({
+            where: {
+              workspaceId,
+
+              userId: {
+                in: requestedRecipients,
+              },
+            },
+
+            select: {
+              userId: true,
+            },
+          })
+        : [];
+
+    const validRecipientIds = validMembers.map((member) => member.userId);
+
+    const comment = await prisma.$transaction(async (transaction) => {
+      const createdComment = await transaction.comment.create({
+        data: {
+          body,
+
+          issueId,
+
+          authorId: userId,
+        },
+
+        include: {
+          author: {
+            select: {
+              id: true,
+
+              name: true,
+
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      if (validRecipientIds.length > 0) {
+        await transaction.notification.createMany({
+          data: validRecipientIds.map((recipientId) => ({
+            type: "COMMENT_MENTION",
+
+            recipientId,
+
+            actorId: userId,
+
+            workspaceId,
+
+            projectId,
+
+            issueId,
+
+            commentId: createdComment.id,
+          })),
+
+          skipDuplicates: true,
+        });
+      }
+
+      return createdComment;
     });
 
     res.status(201).json({
@@ -289,11 +382,13 @@ export async function updateComment(req: AuthenticatedRequest, res: Response) {
     const existingComment = await prisma.comment.findFirst({
       where: {
         id: commentId,
+
         issueId,
       },
 
       select: {
         id: true,
+
         authorId: true,
       },
     });
@@ -327,7 +422,9 @@ export async function updateComment(req: AuthenticatedRequest, res: Response) {
         author: {
           select: {
             id: true,
+
             name: true,
+
             email: true,
           },
         },
@@ -394,11 +491,13 @@ export async function deleteComment(req: AuthenticatedRequest, res: Response) {
     const comment = await prisma.comment.findFirst({
       where: {
         id: commentId,
+
         issueId,
       },
 
       select: {
         id: true,
+
         authorId: true,
       },
     });
