@@ -100,3 +100,44 @@ export async function moveIssue(
 
   return data.issue;
 }
+export interface CreateIssueInput {
+  title: string;
+  description?: string;
+  priority?: IssuePriority;
+  assigneeId?: string | null;
+}
+
+interface CreateIssueResponse {
+  message: string;
+  issue: Issue;
+}
+
+export async function createIssue(
+  workspaceId: string,
+  projectId: string,
+  input: CreateIssueInput,
+  accessToken: string,
+): Promise<Issue> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: "include",
+      body: JSON.stringify(input),
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to create issue");
+  }
+
+  const data: CreateIssueResponse = await response.json();
+
+  return data.issue;
+}

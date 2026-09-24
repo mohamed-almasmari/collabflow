@@ -3,12 +3,15 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 
 import {
+  createIssue,
   getIssues,
   moveIssue,
+  type CreateIssueInput,
   type Issue,
   type IssueStatus,
 } from "../../api/issues";
 
+import CreateIssueForm from "../../components/kanban/CreateIssueForm.tsx";
 import KanbanBoard from "../../components/kanban/KanbanBoard.tsx";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -22,6 +25,8 @@ function ProjectBoardPage() {
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
+
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -68,19 +73,25 @@ function ProjectBoardPage() {
     };
   }, [workspaceId, projectId, accessToken]);
 
-  if (loading) {
-    return <div className="p-8 text-slate-300">Loading board...</div>;
+  async function handleCreateIssue(input: CreateIssueInput) {
+    if (!workspaceId || !projectId || !accessToken) {
+      throw new Error(
+        "Unable to create issue because project information is missing",
+      );
+    }
+
+    const newIssue = await createIssue(
+      workspaceId,
+      projectId,
+      input,
+      accessToken,
+    );
+
+    setIssues((currentIssues) => [...currentIssues, newIssue]);
+
+    setShowCreateForm(false);
   }
 
-  if (error) {
-    return (
-      <div className="p-8">
-        <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300">
-          {error}
-        </div>
-      </div>
-    );
-  }
   async function handleMoveIssue(
     issueId: string,
     status: IssueStatus,
@@ -91,6 +102,8 @@ function ProjectBoardPage() {
     }
 
     const previousIssues = issues;
+
+    setError(null);
 
     setIssues((currentIssues) =>
       currentIssues.map((issue) =>
@@ -129,24 +142,74 @@ function ProjectBoardPage() {
       setError(error instanceof Error ? error.message : "Unable to move issue");
     }
   }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-8">
+        <p className="text-slate-300">Loading board...</p>
+      </main>
+    );
+  }
+
+  if (error && issues.length === 0) {
+    return (
+      <main className="min-h-screen bg-slate-950 p-8">
+        <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300">
+          {error}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-8">
       <div className="mx-auto max-w-7xl">
         <header className="mb-8">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
-            Project Board
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
+                Project Board
+              </p>
 
-          <h1 className="text-3xl font-bold text-white">Kanban Board</h1>
+              <h1 className="text-3xl font-bold text-white">Kanban Board</h1>
 
-          <p className="mt-2 text-slate-400">
-            Track issues across your project workflow.
-          </p>
+              <p className="mt-2 text-slate-400">
+                Track issues across your project workflow.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateForm(true);
+                setError(null);
+              }}
+              className="self-start rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 sm:self-auto"
+            >
+              New Issue
+            </button>
+          </div>
         </header>
+
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300">
+            {error}
+          </div>
+        )}
+
+        {showCreateForm && (
+          <div className="mb-6">
+            <CreateIssueForm
+              onCreate={handleCreateIssue}
+              onCancel={() => setShowCreateForm(false)}
+            />
+          </div>
+        )}
 
         <KanbanBoard issues={issues} onMoveIssue={handleMoveIssue} />
       </div>
     </main>
   );
 }
+
 export default ProjectBoardPage;
