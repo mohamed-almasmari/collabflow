@@ -29,8 +29,47 @@ export interface Issue {
   assignee: IssueUser | null;
 }
 
+export interface CreateIssueInput {
+  title: string;
+  description?: string;
+  priority?: IssuePriority;
+  assigneeId?: string | null;
+}
+
+export interface UpdateIssueInput {
+  title?: string;
+  description?: string | null;
+  status?: IssueStatus;
+  priority?: IssuePriority;
+  assigneeId?: string | null;
+}
+
 interface GetIssuesResponse {
   issues: Issue[];
+}
+
+interface CreateIssueResponse {
+  message: string;
+  issue: Issue;
+}
+
+interface UpdateIssueResponse {
+  message: string;
+  issue: Issue;
+}
+
+interface MoveIssueInput {
+  status: IssueStatus;
+  position: number;
+}
+
+interface MoveIssueResponse {
+  message: string;
+  issue: Issue;
+}
+
+interface DeleteIssueResponse {
+  message: string;
 }
 
 export async function getIssues(
@@ -60,14 +99,65 @@ export async function getIssues(
   return data.issues;
 }
 
-interface MoveIssueInput {
-  status: IssueStatus;
-  position: number;
+export async function createIssue(
+  workspaceId: string,
+  projectId: string,
+  input: CreateIssueInput,
+  accessToken: string,
+): Promise<Issue> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: "include",
+      body: JSON.stringify(input),
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to create issue");
+  }
+
+  const data: CreateIssueResponse = await response.json();
+
+  return data.issue;
 }
 
-interface MoveIssueResponse {
-  message: string;
-  issue: Issue;
+export async function updateIssue(
+  workspaceId: string,
+  projectId: string,
+  issueId: string,
+  input: UpdateIssueInput,
+  accessToken: string,
+): Promise<Issue> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues/${issueId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: "include",
+      body: JSON.stringify(input),
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to update issue");
+  }
+
+  const data: UpdateIssueResponse = await response.json();
+
+  return data.issue;
 }
 
 export async function moveIssue(
@@ -100,87 +190,33 @@ export async function moveIssue(
 
   return data.issue;
 }
-export interface CreateIssueInput {
-  title: string;
-  description?: string;
-  priority?: IssuePriority;
-  assigneeId?: string | null;
-}
 
-interface CreateIssueResponse {
-  message: string;
-  issue: Issue;
-}
-
-export async function createIssue(
-  workspaceId: string,
-  projectId: string,
-  input: CreateIssueInput,
-  accessToken: string,
-): Promise<Issue> {
-  const response = await fetch(
-    `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      credentials: "include",
-      body: JSON.stringify(input),
-    },
-  );
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => null);
-
-    throw new Error(data?.message ?? "Unable to create issue");
-  }
-
-  const data: CreateIssueResponse = await response.json();
-
-  return data.issue;
-}
-export interface UpdateIssueInput {
-  title?: string;
-  description?: string | null;
-  status?: IssueStatus;
-  priority?: IssuePriority;
-  assigneeId?: string | null;
-}
-
-interface UpdateIssueResponse {
-  message: string;
-  issue: Issue;
-}
-
-export async function updateIssue(
+export async function deleteIssue(
   workspaceId: string,
   projectId: string,
   issueId: string,
-  input: UpdateIssueInput,
   accessToken: string,
-): Promise<Issue> {
+): Promise<void> {
   const response = await fetch(
     `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues/${issueId}`,
     {
-      method: "PATCH",
+      method: "DELETE",
       headers: {
-        "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
       credentials: "include",
-      body: JSON.stringify(input),
     },
   );
 
   if (!response.ok) {
     const data = await response.json().catch(() => null);
 
-    throw new Error(data?.message ?? "Unable to update issue");
+    throw new Error(data?.message ?? "Unable to delete issue");
   }
 
-  const data: UpdateIssueResponse = await response.json();
+  const data: DeleteIssueResponse = await response.json();
 
-  return data.issue;
+  if (!data.message) {
+    throw new Error("Invalid delete response");
+  }
 }

@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 
 import {
   createIssue,
+  deleteIssue,
   getIssues,
   moveIssue,
   updateIssue,
@@ -13,7 +14,7 @@ import {
   type UpdateIssueInput,
 } from "../../api/issues";
 
-import CreateIssueForm from "../../components/kanban/CreateIssueForm.tsx";
+import CreateIssueForm from "../../components/kanban/CreateIssueForm";
 import EditIssueForm from "../../components/kanban/EditIssueForm";
 import KanbanBoard from "../../components/kanban/KanbanBoard";
 
@@ -33,6 +34,10 @@ function ProjectBoardPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
+
+  const [deletingIssue, setDeletingIssue] = useState<Issue | null>(null);
+
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -171,15 +176,57 @@ function ProjectBoardPage() {
     }
   }
 
+  async function handleDeleteIssue() {
+    if (!deletingIssue || !workspaceId || !projectId || !accessToken) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setError(null);
+
+      await deleteIssue(workspaceId, projectId, deletingIssue.id, accessToken);
+
+      const refreshedIssues = await getIssues(
+        workspaceId,
+        projectId,
+        accessToken,
+      );
+
+      setIssues(refreshedIssues);
+
+      if (editingIssue?.id === deletingIssue.id) {
+        setEditingIssue(null);
+      }
+
+      setDeletingIssue(null);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Unable to delete issue",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function handleStartCreate() {
     setEditingIssue(null);
+    setDeletingIssue(null);
     setShowCreateForm(true);
     setError(null);
   }
 
   function handleStartEdit(issue: Issue) {
     setShowCreateForm(false);
+    setDeletingIssue(null);
     setEditingIssue(issue);
+    setError(null);
+  }
+
+  function handleStartDelete(issue: Issue) {
+    setShowCreateForm(false);
+    setEditingIssue(null);
+    setDeletingIssue(issue);
     setError(null);
   }
 
@@ -253,10 +300,51 @@ function ProjectBoardPage() {
           </div>
         )}
 
+        {deletingIssue && (
+          <div className="mb-6 rounded-2xl border border-red-900 bg-red-950/30 p-5">
+            <h2 className="text-lg font-semibold text-white">Delete Issue</h2>
+
+            <p className="mt-2 text-sm text-slate-300">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-white">
+                {deletingIssue.title}
+              </span>
+              ?
+            </p>
+
+            <p className="mt-1 text-sm text-red-300">
+              This action cannot be undone.
+            </p>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletingIssue(null)}
+                disabled={deleting}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void handleDeleteIssue();
+                }}
+                disabled={deleting}
+                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete Issue"}
+              </button>
+            </div>
+          </div>
+        )}
+
         <KanbanBoard
           issues={issues}
           onMoveIssue={handleMoveIssue}
           onEditIssue={handleStartEdit}
+          onDeleteIssue={handleStartDelete}
         />
       </div>
     </main>

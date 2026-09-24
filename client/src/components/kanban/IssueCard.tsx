@@ -7,9 +7,10 @@ import type { Issue } from "../../api/issues";
 interface IssueCardProps {
   issue: Issue;
   onEdit: (issue: Issue) => void;
+  onDelete: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, onEdit }: IssueCardProps) {
+function IssueCard({ issue, onEdit, onDelete }: IssueCardProps) {
   const {
     attributes,
     listeners,
@@ -57,24 +58,43 @@ function IssueCard({ issue, onEdit }: IssueCardProps) {
         </p>
       )}
 
-      <div className="flex items-center justify-between text-xs text-slate-500">
-        <span>{issue.assignee ? issue.assignee.name : "Unassigned"}</span>
-
-        <span>#{issue.position + 1}</span>
+      <div className="mb-3 text-xs text-slate-500">
+        {issue.assignee ? `Assigned to ${issue.assignee.name}` : "Unassigned"}
       </div>
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onEdit(issue);
-        }}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-        }}
-        className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
-      >
-        Edit
-      </button>
+
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(issue);
+            }}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
+          >
+            Edit
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(issue);
+            }}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            className="text-xs font-medium text-red-400 hover:text-red-300"
+          >
+            Delete
+          </button>
+        </div>
+
+        <span className="text-xs text-slate-500">#{issue.position + 1}</span>
+      </div>
     </article>
   );
 }
