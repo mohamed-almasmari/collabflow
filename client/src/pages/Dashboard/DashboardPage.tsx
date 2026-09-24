@@ -10,14 +10,23 @@ import {
 } from "../../api/projects";
 
 import {
+  addWorkspaceMember,
   createWorkspace,
+  getWorkspaceById,
   getWorkspaces,
+  removeWorkspaceMember,
+  updateWorkspaceMember,
+  type AddWorkspaceMemberInput,
+  type AssignableWorkspaceRole,
   type CreateWorkspaceInput,
+  type Workspace,
+  type WorkspaceMember,
   type WorkspaceSummary,
 } from "../../api/workspaces";
 
-import CreateProjectForm from "../../pages/Dashboard/CreateProjectForm.tsx";
+import CreateProjectForm from "../../pages/Dashboard/CreateProjectForm";
 import CreateWorkspaceForm from "../../pages/Dashboard/CreateWorkspaceForm";
+import WorkspaceMembersPanel from "../../pages/Dashboard/WorkspaceMembersPanel";
 
 import { useAuth } from "../../hooks/useAuth";
 
@@ -31,15 +40,23 @@ function DashboardPage() {
   const [selectedWorkspace, setSelectedWorkspace] =
     useState<WorkspaceSummary | null>(null);
 
+  const [workspaceDetails, setWorkspaceDetails] = useState<Workspace | null>(
+    null,
+  );
+
   const [projects, setProjects] = useState<Project[]>([]);
 
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
 
   const [loadingProjects, setLoadingProjects] = useState(false);
 
+  const [loadingWorkspaceDetails, setLoadingWorkspaceDetails] = useState(false);
+
   const [showWorkspaceForm, setShowWorkspaceForm] = useState(false);
 
   const [showProjectForm, setShowProjectForm] = useState(false);
+
+  const [showMembersPanel, setShowMembersPanel] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +83,14 @@ function DashboardPage() {
     const data = await getProjects(workspaceId, token);
 
     setProjects(data);
+  }
+
+  async function loadWorkspaceDetails(workspaceId: string, token: string) {
+    const data = await getWorkspaceById(workspaceId, token);
+
+    setWorkspaceDetails(data);
+
+    return data;
   }
 
   useEffect(() => {
@@ -116,6 +141,8 @@ function DashboardPage() {
   useEffect(() => {
     if (!selectedWorkspace || !accessToken) {
       setProjects([]);
+      setWorkspaceDetails(null);
+
       return;
     }
 
@@ -125,30 +152,41 @@ function DashboardPage() {
 
     let cancelled = false;
 
-    async function loadWorkspaceProjects() {
+    async function loadSelectedWorkspace() {
       try {
         setLoadingProjects(true);
+
+        setLoadingWorkspaceDetails(true);
+
         setError(null);
 
-        const data = await getProjects(workspaceId, currentAccessToken);
+        const [projectData, workspaceData] = await Promise.all([
+          getProjects(workspaceId, currentAccessToken),
+
+          getWorkspaceById(workspaceId, currentAccessToken),
+        ]);
 
         if (!cancelled) {
-          setProjects(data);
+          setProjects(projectData);
+
+          setWorkspaceDetails(workspaceData);
         }
       } catch (error) {
         if (!cancelled) {
           setError(
-            error instanceof Error ? error.message : "Unable to load projects",
+            error instanceof Error ? error.message : "Unable to load workspace",
           );
         }
       } finally {
         if (!cancelled) {
           setLoadingProjects(false);
+
+          setLoadingWorkspaceDetails(false);
         }
       }
     }
 
-    void loadWorkspaceProjects();
+    void loadSelectedWorkspace();
 
     return () => {
       cancelled = true;
@@ -179,10 +217,51 @@ function DashboardPage() {
     setShowProjectForm(false);
   }
 
+  async function handleAddMember(input: AddWorkspaceMemberInput) {
+    if (!selectedWorkspace || !accessToken) {
+      throw new Error("Workspace is required");
+    }
+
+    await addWorkspaceMember(selectedWorkspace.id, input, accessToken);
+
+    await loadWorkspaceDetails(selectedWorkspace.id, accessToken);
+  }
+
+  async function handleUpdateMember(
+    member: WorkspaceMember,
+    role: AssignableWorkspaceRole,
+  ) {
+    if (!selectedWorkspace || !accessToken) {
+      throw new Error("Workspace is required");
+    }
+
+    await updateWorkspaceMember(
+      selectedWorkspace.id,
+      member.id,
+      {
+        role,
+      },
+      accessToken,
+    );
+
+    await loadWorkspaceDetails(selectedWorkspace.id, accessToken);
+  }
+
+  async function handleRemoveMember(member: WorkspaceMember) {
+    if (!selectedWorkspace || !accessToken) {
+      throw new Error("Workspace is required");
+    }
+
+    await removeWorkspaceMember(selectedWorkspace.id, member.id, accessToken);
+
+    await loadWorkspaceDetails(selectedWorkspace.id, accessToken);
+  }
+
   function handleSelectWorkspace(workspace: WorkspaceSummary) {
     setSelectedWorkspace(workspace);
 
     setShowProjectForm(false);
+    setShowMembersPanel(false);
     setError(null);
   }
 
@@ -198,13 +277,22 @@ function DashboardPage() {
 
   function handleStartWorkspaceCreation() {
     setShowProjectForm(false);
+    setShowMembersPanel(false);
     setShowWorkspaceForm(true);
     setError(null);
   }
 
   function handleStartProjectCreation() {
     setShowWorkspaceForm(false);
+    setShowMembersPanel(false);
     setShowProjectForm(true);
+    setError(null);
+  }
+
+  function handleStartMemberManagement() {
+    setShowWorkspaceForm(false);
+    setShowProjectForm(false);
+    setShowMembersPanel(true);
     setError(null);
   }
 
@@ -228,7 +316,7 @@ function DashboardPage() {
             <h1 className="text-3xl font-bold">Dashboard</h1>
 
             <p className="mt-2 text-slate-400">
-              Manage your workspaces and projects.
+              Manage your workspaces, projects, and team.
             </p>
           </div>
 
@@ -261,6 +349,18 @@ function DashboardPage() {
             <CreateProjectForm
               onCreate={handleCreateProject}
               onCancel={() => setShowProjectForm(false)}
+            />
+          </div>
+        )}
+
+        {showMembersPanel && workspaceDetails && (
+          <div className="mb-6">
+            <WorkspaceMembersPanel
+              workspace={workspaceDetails}
+              onAddMember={handleAddMember}
+              onUpdateMember={handleUpdateMember}
+              onRemoveMember={handleRemoveMember}
+              onClose={() => setShowMembersPanel(false)}
             />
           </div>
         )}
@@ -329,16 +429,36 @@ function DashboardPage() {
                       {selectedWorkspace.description ??
                         "No workspace description."}
                     </p>
+
+                    {workspaceDetails && (
+                      <p className="mt-3 text-sm text-slate-500">
+                        {workspaceDetails.members.length}{" "}
+                        {workspaceDetails.members.length === 1
+                          ? "member"
+                          : "members"}
+                      </p>
+                    )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleStartProjectCreation}
-                    disabled={selectedWorkspace.role === "MEMBER"}
-                    className="rounded-lg border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-600"
-                  >
-                    New Project
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleStartMemberManagement}
+                      disabled={loadingWorkspaceDetails}
+                      className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      Manage Members
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleStartProjectCreation}
+                      disabled={selectedWorkspace.role === "MEMBER"}
+                      className="rounded-lg border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-600"
+                    >
+                      New Project
+                    </button>
+                  </div>
                 </header>
 
                 <div className="mb-4 flex items-center justify-between">

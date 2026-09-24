@@ -2,6 +2,8 @@ const API_URL = "http://localhost:3000/api";
 
 export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
+export type AssignableWorkspaceRole = "ADMIN" | "MEMBER";
+
 export interface WorkspaceUser {
   id: string;
   name: string;
@@ -49,6 +51,15 @@ export interface CreateWorkspaceInput {
   description?: string;
 }
 
+export interface AddWorkspaceMemberInput {
+  email: string;
+  role: AssignableWorkspaceRole;
+}
+
+export interface UpdateWorkspaceMemberInput {
+  role: AssignableWorkspaceRole;
+}
+
 interface GetWorkspacesResponse {
   workspaces: WorkspaceSummary[];
 }
@@ -68,6 +79,20 @@ interface CreateWorkspaceResponse {
     createdAt: string;
     updatedAt: string;
   };
+}
+
+interface AddWorkspaceMemberResponse {
+  message: string;
+  member: WorkspaceMember;
+}
+
+interface UpdateWorkspaceMemberResponse {
+  message: string;
+  member: WorkspaceMember;
+}
+
+interface DeleteWorkspaceMemberResponse {
+  message: string;
 }
 
 export async function getWorkspaces(
@@ -139,5 +164,90 @@ export async function createWorkspace(
 
   if (!data.workspace) {
     throw new Error("Invalid workspace response");
+  }
+}
+
+export async function addWorkspaceMember(
+  workspaceId: string,
+  input: AddWorkspaceMemberInput,
+  accessToken: string,
+): Promise<WorkspaceMember> {
+  const response = await fetch(`${API_URL}/workspaces/${workspaceId}/members`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to add workspace member");
+  }
+
+  const data: AddWorkspaceMemberResponse = await response.json();
+
+  return data.member;
+}
+
+export async function updateWorkspaceMember(
+  workspaceId: string,
+  memberId: string,
+  input: UpdateWorkspaceMemberInput,
+  accessToken: string,
+): Promise<WorkspaceMember> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/members/${memberId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: "include",
+      body: JSON.stringify(input),
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to update workspace member");
+  }
+
+  const data: UpdateWorkspaceMemberResponse = await response.json();
+
+  return data.member;
+}
+
+export async function removeWorkspaceMember(
+  workspaceId: string,
+  memberId: string,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/members/${memberId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: "include",
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to remove workspace member");
+  }
+
+  const data: DeleteWorkspaceMemberResponse = await response.json();
+
+  if (!data.message) {
+    throw new Error("Invalid remove member response");
   }
 }
