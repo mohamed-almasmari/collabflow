@@ -7,9 +7,9 @@ import {
   updateProject,
 } from "../controllers/project.controller.js";
 
-import { requireAuth } from "../middleware/auth.middleware.js";
+import { getProjectActivity } from "../controllers/activity.controller.js";
 
-import issueRoutes from "../routes/issue.routers.js";
+import { requireAuth } from "../middleware/auth.middleware.js";
 
 const router = Router({
   mergeParams: true,
@@ -19,7 +19,7 @@ router.get("/", requireAuth, getProjects);
 
 router.post("/", requireAuth, createProject);
 
-router.use("/:projectId/issues", issueRoutes);
+router.get("/:projectId/activity", requireAuth, getProjectActivity);
 
 router.get("/:projectId", requireAuth, getProjectById);
 

@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useParams } from "react-router";
+
+import { getProjectActivity, type ActivityLog } from "../../api/activity";
 
 import {
   createIssue,
@@ -23,6 +25,7 @@ import {
   type WorkspaceMember,
 } from "../../api/workspaces";
 
+import ActivityTimeline from "../../components/activity/ActivityTimeline";
 import CreateIssueForm from "../../components/kanban/CreateIssueForm";
 import EditIssueForm from "../../components/kanban/EditIssueForm";
 import KanbanBoard from "../../components/kanban/KanbanBoard";
@@ -53,6 +56,10 @@ function ProjectBoardPage() {
 
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
 
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+
+  const [activityLoading, setActivityLoading] = useState(false);
+
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   const [project, setProject] = useState<Project | null>(null);
@@ -75,6 +82,28 @@ function ProjectBoardPage() {
 
   const [deleting, setDeleting] = useState(false);
 
+  const loadActivity = useCallback(async () => {
+    if (!workspaceId || !projectId || !accessToken) {
+      return;
+    }
+
+    try {
+      setActivityLoading(true);
+
+      const data = await getProjectActivity(
+        workspaceId,
+        projectId,
+        accessToken,
+      );
+
+      setActivities(data);
+    } catch (activityError) {
+      console.error("Unable to refresh activity:", activityError);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, [workspaceId, projectId, accessToken]);
+
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
       return;
@@ -93,17 +122,24 @@ function ProjectBoardPage() {
         setLoading(true);
         setError(null);
 
-        const [issueData, workspaceData, projectData] = await Promise.all([
-          getIssues(currentWorkspaceId, currentProjectId, currentAccessToken),
+        const [issueData, workspaceData, projectData, activityData] =
+          await Promise.all([
+            getIssues(currentWorkspaceId, currentProjectId, currentAccessToken),
 
-          getWorkspaceById(currentWorkspaceId, currentAccessToken),
+            getWorkspaceById(currentWorkspaceId, currentAccessToken),
 
-          getProjectById(
-            currentWorkspaceId,
-            currentProjectId,
-            currentAccessToken,
-          ),
-        ]);
+            getProjectById(
+              currentWorkspaceId,
+              currentProjectId,
+              currentAccessToken,
+            ),
+
+            getProjectActivity(
+              currentWorkspaceId,
+              currentProjectId,
+              currentAccessToken,
+            ),
+          ]);
 
         if (cancelled) {
           return;
@@ -116,11 +152,13 @@ function ProjectBoardPage() {
         setWorkspace(workspaceData);
 
         setProject(projectData);
-      } catch (error) {
+
+        setActivities(activityData);
+      } catch (loadError) {
         if (!cancelled) {
           setError(
-            error instanceof Error
-              ? error.message
+            loadError instanceof Error
+              ? loadError.message
               : "Unable to load project board",
           );
         }
@@ -169,6 +207,12 @@ function ProjectBoardPage() {
         payload.workspaceId === currentWorkspaceId &&
         payload.projectId === currentProjectId
       );
+    }
+
+    function refreshActivitySoon() {
+      window.setTimeout(() => {
+        void loadActivity();
+      }, 300);
     }
 
     function joinProjectRoom() {
@@ -263,6 +307,8 @@ function ProjectBoardPage() {
       setIssues((currentIssues) =>
         addRealtimeIssue(currentIssues, payload.issue),
       );
+
+      refreshActivitySoon();
     }
 
     function handleIssueUpdated(payload: {
@@ -278,15 +324,7 @@ function ProjectBoardPage() {
         updateRealtimeIssue(currentIssues, payload.issue),
       );
 
-      /*
-       * Important:
-       * Do NOT replace editingIssue here.
-       *
-       * If this browser is editing the
-       * same issue, its original updatedAt
-       * must remain intact so the server
-       * can detect a stale save.
-       */
+      refreshActivitySoon();
     }
 
     function handleIssueMoved(payload: {
@@ -301,6 +339,8 @@ function ProjectBoardPage() {
       setIssues((currentIssues) =>
         moveRealtimeIssue(currentIssues, payload.issue),
       );
+
+      refreshActivitySoon();
     }
 
     function handleIssueDeleted(payload: {
@@ -327,6 +367,8 @@ function ProjectBoardPage() {
           ? null
           : currentEditingIssue,
       );
+
+      refreshActivitySoon();
     }
 
     socket.on("connect", joinProjectRoom);
@@ -359,7 +401,6 @@ function ProjectBoardPage() {
       }
 
       setPresenceUsers([]);
-
       setIssueActivities([]);
 
       socket.off("connect", joinProjectRoom);
@@ -382,7 +423,7 @@ function ProjectBoardPage() {
 
       socket.off("issue:deleted", handleIssueDeleted);
     };
-  }, [workspaceId, projectId, accessToken]);
+  }, [workspaceId, projectId, accessToken, loadActivity]);
 
   function emitIssueEvent(
     event: "issue:created" | "issue:updated" | "issue:moved" | "issue:deleted",
@@ -430,6 +471,12 @@ function ProjectBoardPage() {
     });
   }
 
+  function refreshActivitySoon() {
+    window.setTimeout(() => {
+      void loadActivity();
+    }, 300);
+  }
+
   async function handleCreateIssue(input: CreateIssueInput) {
     if (!workspaceId || !projectId || !accessToken) {
       throw new Error("Unable to create issue");
@@ -447,6 +494,8 @@ function ProjectBoardPage() {
     setShowCreateForm(false);
 
     emitIssueEvent("issue:created", newIssue.id);
+
+    refreshActivitySoon();
   }
 
   async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
@@ -475,8 +524,10 @@ function ProjectBoardPage() {
       setEditingIssue(null);
 
       emitIssueEvent("issue:updated", updatedIssue.id);
-    } catch (error) {
-      if (error instanceof IssueConflictError) {
+
+      refreshActivitySoon();
+    } catch (updateError) {
+      if (updateError instanceof IssueConflictError) {
         const latestIssue = issues.find((issue) => issue.id === issueId);
 
         if (latestIssue) {
@@ -484,11 +535,11 @@ function ProjectBoardPage() {
         }
 
         throw new IssueConflictError(
-          "Another collaborator changed this issue while you were editing it. The form has been refreshed with the latest issue. Review the changes and save again.",
+          "Another collaborator changed this issue while you were editing it. Review the latest version and save again.",
         );
       }
 
-      throw error;
+      throw updateError;
     } finally {
       emitIssueActivity(issueId, "EDITING", false);
     }
@@ -540,10 +591,14 @@ function ProjectBoardPage() {
       );
 
       emitIssueEvent("issue:moved", movedIssue.id);
-    } catch (error) {
+
+      refreshActivitySoon();
+    } catch (moveError) {
       setIssues(previousIssues);
 
-      setError(error instanceof Error ? error.message : "Unable to move issue");
+      setError(
+        moveError instanceof Error ? moveError.message : "Unable to move issue",
+      );
     }
   }
 
@@ -575,9 +630,13 @@ function ProjectBoardPage() {
       setDeletingIssue(null);
 
       emitIssueEvent("issue:deleted", issueId);
-    } catch (error) {
+
+      refreshActivitySoon();
+    } catch (deleteError) {
       setError(
-        error instanceof Error ? error.message : "Unable to delete issue",
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete issue",
       );
     } finally {
       setDeleting(false);
@@ -602,9 +661,7 @@ function ProjectBoardPage() {
 
     setShowCreateForm(false);
     setDeletingIssue(null);
-
     setEditingIssue(issue);
-
     setError(null);
 
     emitIssueActivity(issue.id, "EDITING", true);
@@ -793,14 +850,22 @@ function ProjectBoardPage() {
           </div>
         )}
 
-        <KanbanBoard
-          issues={issues}
-          activities={issueActivities}
-          onMoveIssue={handleMoveIssue}
-          onEditIssue={handleStartEdit}
-          onDeleteIssue={handleStartDelete}
-          onDragActivity={handleDragActivity}
-        />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <KanbanBoard
+            issues={issues}
+            activities={issueActivities}
+            onMoveIssue={handleMoveIssue}
+            onEditIssue={handleStartEdit}
+            onDeleteIssue={handleStartDelete}
+            onDragActivity={handleDragActivity}
+          />
+
+          <ActivityTimeline
+            activities={activities}
+            loading={activityLoading}
+            onRefresh={loadActivity}
+          />
+        </div>
       </div>
     </main>
   );
