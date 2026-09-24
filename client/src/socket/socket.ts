@@ -1,13 +1,22 @@
 import { io, type Socket } from "socket.io-client";
 
+import type { Issue } from "../api/issues";
+
 interface ProjectRoomPayload {
   workspaceId: string;
   projectId: string;
 }
 
-interface BoardRefreshPayload {
-  workspaceId: string;
-  projectId: string;
+interface IssueMutationPayload extends ProjectRoomPayload {
+  issueId: string;
+}
+
+interface IssueRealtimePayload extends ProjectRoomPayload {
+  issue: Issue;
+}
+
+interface IssueDeletedPayload extends ProjectRoomPayload {
+  issueId: string;
 }
 
 interface SocketErrorPayload {
@@ -15,7 +24,13 @@ interface SocketErrorPayload {
 }
 
 interface ServerToClientEvents {
-  "board:refresh": (payload: BoardRefreshPayload) => void;
+  "issue:created": (payload: IssueRealtimePayload) => void;
+
+  "issue:updated": (payload: IssueRealtimePayload) => void;
+
+  "issue:moved": (payload: IssueRealtimePayload) => void;
+
+  "issue:deleted": (payload: IssueDeletedPayload) => void;
 
   "socket:error": (payload: SocketErrorPayload) => void;
 }
@@ -25,7 +40,13 @@ interface ClientToServerEvents {
 
   "project:leave": (payload: ProjectRoomPayload) => void;
 
-  "board:changed": (payload: BoardRefreshPayload) => void;
+  "issue:created": (payload: IssueMutationPayload) => void;
+
+  "issue:updated": (payload: IssueMutationPayload) => void;
+
+  "issue:moved": (payload: IssueMutationPayload) => void;
+
+  "issue:deleted": (payload: IssueDeletedPayload) => void;
 }
 
 export type CollabFlowSocket = Socket<
@@ -78,11 +99,13 @@ export function getSocket(accessToken: string): CollabFlowSocket {
 }
 
 export function disconnectSocket() {
-  if (socket) {
-    socket.disconnect();
-
-    socket = null;
-
-    currentAccessToken = null;
+  if (!socket) {
+    return;
   }
+
+  socket.disconnect();
+
+  socket = null;
+
+  currentAccessToken = null;
 }

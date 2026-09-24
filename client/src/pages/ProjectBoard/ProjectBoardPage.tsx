@@ -30,6 +30,13 @@ import { useAuth } from "../../hooks/useAuth";
 
 import { getSocket } from "../../socket/socket";
 
+import {
+  addRealtimeIssue,
+  deleteRealtimeIssue,
+  moveRealtimeIssue,
+  updateRealtimeIssue,
+} from "../../utils/issueRealtime";
+
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
 
@@ -131,15 +138,23 @@ function ProjectBoardPage() {
 
     const currentProjectId = projectId;
 
-    const currentAccessToken = accessToken;
-
-    const socket = getSocket(currentAccessToken);
+    const socket = getSocket(accessToken);
 
     const roomPayload = {
       workspaceId: currentWorkspaceId,
 
       projectId: currentProjectId,
     };
+
+    function belongsToCurrentProject(payload: {
+      workspaceId: string;
+      projectId: string;
+    }) {
+      return (
+        payload.workspaceId === currentWorkspaceId &&
+        payload.projectId === currentProjectId
+      );
+    }
 
     function joinProjectRoom() {
       setRealtimeConnected(true);
@@ -161,30 +176,60 @@ function ProjectBoardPage() {
       setError(payload.message);
     }
 
-    async function handleBoardRefresh(payload: {
+    function handleIssueCreated(payload: {
       workspaceId: string;
       projectId: string;
+      issue: Issue;
     }) {
-      if (
-        payload.workspaceId !== currentWorkspaceId ||
-        payload.projectId !== currentProjectId
-      ) {
+      if (!belongsToCurrentProject(payload)) {
         return;
       }
 
-      try {
-        const refreshedIssues = await getIssues(
-          currentWorkspaceId,
-          currentProjectId,
-          currentAccessToken,
-        );
+      setIssues((currentIssues) =>
+        addRealtimeIssue(currentIssues, payload.issue),
+      );
+    }
 
-        setIssues(refreshedIssues);
-      } catch (error) {
-        setError(
-          error instanceof Error ? error.message : "Unable to refresh board",
-        );
+    function handleIssueUpdated(payload: {
+      workspaceId: string;
+      projectId: string;
+      issue: Issue;
+    }) {
+      if (!belongsToCurrentProject(payload)) {
+        return;
       }
+
+      setIssues((currentIssues) =>
+        updateRealtimeIssue(currentIssues, payload.issue),
+      );
+    }
+
+    function handleIssueMoved(payload: {
+      workspaceId: string;
+      projectId: string;
+      issue: Issue;
+    }) {
+      if (!belongsToCurrentProject(payload)) {
+        return;
+      }
+
+      setIssues((currentIssues) =>
+        moveRealtimeIssue(currentIssues, payload.issue),
+      );
+    }
+
+    function handleIssueDeleted(payload: {
+      workspaceId: string;
+      projectId: string;
+      issueId: string;
+    }) {
+      if (!belongsToCurrentProject(payload)) {
+        return;
+      }
+
+      setIssues((currentIssues) =>
+        deleteRealtimeIssue(currentIssues, payload.issueId),
+      );
     }
 
     socket.on("connect", joinProjectRoom);
@@ -195,7 +240,13 @@ function ProjectBoardPage() {
 
     socket.on("socket:error", handleSocketError);
 
-    socket.on("board:refresh", handleBoardRefresh);
+    socket.on("issue:created", handleIssueCreated);
+
+    socket.on("issue:updated", handleIssueUpdated);
+
+    socket.on("issue:moved", handleIssueMoved);
+
+    socket.on("issue:deleted", handleIssueDeleted);
 
     if (socket.connected) {
       joinProjectRoom();
@@ -214,11 +265,20 @@ function ProjectBoardPage() {
 
       socket.off("socket:error", handleSocketError);
 
-      socket.off("board:refresh", handleBoardRefresh);
+      socket.off("issue:created", handleIssueCreated);
+
+      socket.off("issue:updated", handleIssueUpdated);
+
+      socket.off("issue:moved", handleIssueMoved);
+
+      socket.off("issue:deleted", handleIssueDeleted);
     };
   }, [workspaceId, projectId, accessToken]);
 
-  function broadcastBoardChange() {
+  function emitIssueEvent(
+    event: "issue:created" | "issue:updated" | "issue:moved" | "issue:deleted",
+    issueId: string,
+  ) {
     if (!workspaceId || !projectId || !accessToken) {
       return;
     }
@@ -229,9 +289,10 @@ function ProjectBoardPage() {
       return;
     }
 
-    socket.emit("board:changed", {
+    socket.emit(event, {
       workspaceId,
       projectId,
+      issueId,
     });
   }
 
@@ -247,11 +308,11 @@ function ProjectBoardPage() {
       accessToken,
     );
 
-    setIssues((currentIssues) => [...currentIssues, newIssue]);
+    setIssues((currentIssues) => addRealtimeIssue(currentIssues, newIssue));
 
     setShowCreateForm(false);
 
-    broadcastBoardChange();
+    emitIssueEvent("issue:created", newIssue.id);
   }
 
   async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
@@ -268,14 +329,12 @@ function ProjectBoardPage() {
     );
 
     setIssues((currentIssues) =>
-      currentIssues.map((issue) =>
-        issue.id === updatedIssue.id ? updatedIssue : issue,
-      ),
+      updateRealtimeIssue(currentIssues, updatedIssue),
     );
 
     setEditingIssue(null);
 
-    broadcastBoardChange();
+    emitIssueEvent("issue:updated", updatedIssue.id);
   }
 
   async function handleMoveIssue(
@@ -289,22 +348,26 @@ function ProjectBoardPage() {
 
     const previousIssues = issues;
 
+    const existingIssue = issues.find((issue) => issue.id === issueId);
+
+    if (!existingIssue) {
+      return;
+    }
+
+    const optimisticIssue: Issue = {
+      ...existingIssue,
+      status,
+      position,
+    };
+
     setError(null);
 
     setIssues((currentIssues) =>
-      currentIssues.map((issue) =>
-        issue.id === issueId
-          ? {
-              ...issue,
-              status,
-              position,
-            }
-          : issue,
-      ),
+      moveRealtimeIssue(currentIssues, optimisticIssue),
     );
 
     try {
-      await moveIssue(
+      const movedIssue = await moveIssue(
         workspaceId,
         projectId,
         issueId,
@@ -315,15 +378,11 @@ function ProjectBoardPage() {
         accessToken,
       );
 
-      const refreshedIssues = await getIssues(
-        workspaceId,
-        projectId,
-        accessToken,
+      setIssues((currentIssues) =>
+        moveRealtimeIssue(currentIssues, movedIssue),
       );
 
-      setIssues(refreshedIssues);
-
-      broadcastBoardChange();
+      emitIssueEvent("issue:moved", movedIssue.id);
     } catch (error) {
       setIssues(previousIssues);
 
@@ -336,27 +395,23 @@ function ProjectBoardPage() {
       return;
     }
 
+    const issueId = deletingIssue.id;
+
     try {
       setDeleting(true);
       setError(null);
 
-      await deleteIssue(workspaceId, projectId, deletingIssue.id, accessToken);
+      await deleteIssue(workspaceId, projectId, issueId, accessToken);
 
-      const refreshedIssues = await getIssues(
-        workspaceId,
-        projectId,
-        accessToken,
-      );
+      setIssues((currentIssues) => deleteRealtimeIssue(currentIssues, issueId));
 
-      setIssues(refreshedIssues);
-
-      if (editingIssue?.id === deletingIssue.id) {
+      if (editingIssue?.id === issueId) {
         setEditingIssue(null);
       }
 
       setDeletingIssue(null);
 
-      broadcastBoardChange();
+      emitIssueEvent("issue:deleted", issueId);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Unable to delete issue",

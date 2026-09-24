@@ -11,15 +11,60 @@ interface ProjectRoomPayload {
   projectId: string;
 }
 
-interface BoardRefreshPayload {
-  workspaceId: string;
+interface IssueMutationPayload extends ProjectRoomPayload {
+  issueId: string;
+}
+
+interface RealtimeIssueUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface RealtimeIssue {
+  id: string;
+  title: string;
+  description: string | null;
+
+  status: "TODO" | "IN_PROGRESS" | "DONE";
+
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+  position: number;
+
   projectId: string;
+  createdById: string;
+  assigneeId: string | null;
+
+  createdAt: string;
+  updatedAt: string;
+
+  createdBy: RealtimeIssueUser;
+  assignee: RealtimeIssueUser | null;
+}
+
+interface IssueRealtimePayload extends ProjectRoomPayload {
+  issue: RealtimeIssue;
+}
+
+interface IssueDeletedPayload extends ProjectRoomPayload {
+  issueId: string;
+}
+
+interface SocketErrorPayload {
+  message: string;
 }
 
 interface ServerToClientEvents {
-  "board:refresh": (payload: BoardRefreshPayload) => void;
+  "issue:created": (payload: IssueRealtimePayload) => void;
 
-  "socket:error": (payload: { message: string }) => void;
+  "issue:updated": (payload: IssueRealtimePayload) => void;
+
+  "issue:moved": (payload: IssueRealtimePayload) => void;
+
+  "issue:deleted": (payload: IssueDeletedPayload) => void;
+
+  "socket:error": (payload: SocketErrorPayload) => void;
 }
 
 interface ClientToServerEvents {
@@ -27,7 +72,13 @@ interface ClientToServerEvents {
 
   "project:leave": (payload: ProjectRoomPayload) => void;
 
-  "board:changed": (payload: BoardRefreshPayload) => void;
+  "issue:created": (payload: IssueMutationPayload) => void;
+
+  "issue:updated": (payload: IssueMutationPayload) => void;
+
+  "issue:moved": (payload: IssueMutationPayload) => void;
+
+  "issue:deleted": (payload: IssueDeletedPayload) => void;
 }
 
 interface SocketData {
@@ -45,13 +96,21 @@ function getProjectRoom(workspaceId: string, projectId: string) {
   return `workspace:${workspaceId}:project:${projectId}`;
 }
 
-function isValidRoomPayload(payload: ProjectRoomPayload) {
+function isValidProjectPayload(payload: ProjectRoomPayload) {
   return Boolean(
     payload &&
     typeof payload.workspaceId === "string" &&
     payload.workspaceId.trim() &&
     typeof payload.projectId === "string" &&
     payload.projectId.trim(),
+  );
+}
+
+function isValidIssuePayload(payload: IssueMutationPayload) {
+  return Boolean(
+    isValidProjectPayload(payload) &&
+    typeof payload.issueId === "string" &&
+    payload.issueId.trim(),
   );
 }
 
@@ -111,6 +170,81 @@ async function canAccessProject(
   return Boolean(project);
 }
 
+async function getRealtimeIssue(
+  workspaceId: string,
+  projectId: string,
+  issueId: string,
+): Promise<RealtimeIssue | null> {
+  const issue = await prisma.issue.findFirst({
+    where: {
+      id: issueId,
+
+      project: {
+        id: projectId,
+        workspaceId,
+      },
+    },
+
+    include: {
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!issue) {
+    return null;
+  }
+
+  return {
+    id: issue.id,
+    title: issue.title,
+    description: issue.description,
+
+    status: issue.status,
+
+    priority: issue.priority,
+
+    position: issue.position,
+
+    projectId: issue.projectId,
+
+    createdById: issue.createdById,
+
+    assigneeId: issue.assigneeId,
+
+    createdAt: issue.createdAt.toISOString(),
+
+    updatedAt: issue.updatedAt.toISOString(),
+
+    createdBy: issue.createdBy,
+
+    assignee: issue.assignee,
+  };
+}
+
+async function isAuthorizedRoom(
+  socket: CollabFlowSocket,
+  workspaceId: string,
+  projectId: string,
+) {
+  const room = getProjectRoom(workspaceId, projectId);
+
+  return socket.rooms.has(room);
+}
+
 export function initializeSocketServer(httpServer: HttpServer) {
   const clientOrigin = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
 
@@ -166,7 +300,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
     console.log(`Socket connected: ${socket.id} user=${socket.data.userId}`);
 
     socket.on("project:join", async (payload) => {
-      if (!isValidRoomPayload(payload)) {
+      if (!isValidProjectPayload(payload)) {
         socket.emit("socket:error", {
           message: "Invalid project room request",
         });
@@ -204,25 +338,27 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
 
     socket.on("project:leave", async (payload) => {
-      if (!isValidRoomPayload(payload)) {
+      if (!isValidProjectPayload(payload)) {
         return;
       }
 
       const room = getProjectRoom(payload.workspaceId, payload.projectId);
 
       await socket.leave(room);
-
-      console.log(`Socket ${socket.id} left ${room}`);
     });
 
-    socket.on("board:changed", (payload) => {
-      if (!isValidRoomPayload(payload)) {
+    socket.on("issue:created", async (payload) => {
+      if (!isValidIssuePayload(payload)) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
-
-      if (!socket.rooms.has(room)) {
+      if (
+        !(await isAuthorizedRoom(
+          socket,
+          payload.workspaceId,
+          payload.projectId,
+        ))
+      ) {
         socket.emit("socket:error", {
           message: "You are not authorized for this project room",
         });
@@ -230,10 +366,122 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      socket.to(room).emit("board:refresh", {
+      const issue = await getRealtimeIssue(
+        payload.workspaceId,
+        payload.projectId,
+        payload.issueId,
+      );
+
+      if (!issue) {
+        return;
+      }
+
+      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+      socket.to(room).emit("issue:created", {
         workspaceId: payload.workspaceId,
 
         projectId: payload.projectId,
+
+        issue,
+      });
+    });
+
+    socket.on("issue:updated", async (payload) => {
+      if (!isValidIssuePayload(payload)) {
+        return;
+      }
+
+      if (
+        !(await isAuthorizedRoom(
+          socket,
+          payload.workspaceId,
+          payload.projectId,
+        ))
+      ) {
+        return;
+      }
+
+      const issue = await getRealtimeIssue(
+        payload.workspaceId,
+        payload.projectId,
+        payload.issueId,
+      );
+
+      if (!issue) {
+        return;
+      }
+
+      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+      socket.to(room).emit("issue:updated", {
+        workspaceId: payload.workspaceId,
+
+        projectId: payload.projectId,
+
+        issue,
+      });
+    });
+
+    socket.on("issue:moved", async (payload) => {
+      if (!isValidIssuePayload(payload)) {
+        return;
+      }
+
+      if (
+        !(await isAuthorizedRoom(
+          socket,
+          payload.workspaceId,
+          payload.projectId,
+        ))
+      ) {
+        return;
+      }
+
+      const issue = await getRealtimeIssue(
+        payload.workspaceId,
+        payload.projectId,
+        payload.issueId,
+      );
+
+      if (!issue) {
+        return;
+      }
+
+      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+      socket.to(room).emit("issue:moved", {
+        workspaceId: payload.workspaceId,
+
+        projectId: payload.projectId,
+
+        issue,
+      });
+    });
+
+    socket.on("issue:deleted", async (payload) => {
+      if (!isValidIssuePayload(payload)) {
+        return;
+      }
+
+      if (
+        !(await isAuthorizedRoom(
+          socket,
+          payload.workspaceId,
+          payload.projectId,
+        ))
+      ) {
+        return;
+      }
+
+      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+      socket.to(room).emit("issue:deleted", {
+        workspaceId: payload.workspaceId,
+
+        projectId: payload.projectId,
+
+        issueId: payload.issueId,
       });
     });
 
