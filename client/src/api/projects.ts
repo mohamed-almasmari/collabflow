@@ -23,9 +23,39 @@ export interface Project {
   createdBy: ProjectCreator;
 }
 
+interface GetProjectsResponse {
+  projects: Project[];
+}
+
 interface GetProjectResponse {
   project: Project;
   currentUserRole: string;
+}
+
+export async function getProjects(
+  workspaceId: string,
+  accessToken: string,
+): Promise<Project[]> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/projects`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      credentials: "include",
+    },
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to load projects");
+  }
+
+  const data: GetProjectsResponse = await response.json();
+
+  return data.projects;
 }
 
 export async function getProjectById(
