@@ -4,8 +4,10 @@ import { prisma } from "../config/database.js";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware.js";
 import {
   createIssueSchema,
+  moveIssueSchema,
   updateIssueSchema,
 } from "../validators/issue.schema.js";
+
 export async function createIssue(req: AuthenticatedRequest, res: Response) {
   if (!req.userId) {
     return res.status(401).json({
@@ -89,11 +91,28 @@ export async function createIssue(req: AuthenticatedRequest, res: Response) {
       }
     }
 
+    const lastIssue = await prisma.issue.findFirst({
+      where: {
+        projectId,
+        status: "TODO",
+      },
+      orderBy: {
+        position: "desc",
+      },
+      select: {
+        position: true,
+      },
+    });
+
+    const nextPosition = (lastIssue?.position ?? -1) + 1;
+
     const issue = await prisma.issue.create({
       data: {
         title,
         description: description ?? null,
         priority: priority ?? "MEDIUM",
+        status: "TODO",
+        position: nextPosition,
         projectId,
         createdById: req.userId,
         assigneeId: assigneeId ?? null,
@@ -199,9 +218,14 @@ export async function getIssues(req: AuthenticatedRequest, res: Response) {
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: [
+        {
+          status: "asc",
+        },
+        {
+          position: "asc",
+        },
+      ],
     });
 
     return res.status(200).json({
@@ -465,6 +489,148 @@ export async function updateIssue(req: AuthenticatedRequest, res: Response) {
 
     return res.status(500).json({
       message: "Unable to update issue",
+    });
+  }
+}
+export async function moveIssue(req: AuthenticatedRequest, res: Response) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  const workspaceId = req.params.workspaceId;
+  const projectId = req.params.projectId;
+  const issueId = req.params.issueId;
+
+  if (
+    typeof workspaceId !== "string" ||
+    typeof projectId !== "string" ||
+    typeof issueId !== "string"
+  ) {
+    return res.status(400).json({
+      message: "Workspace ID, project ID, and issue ID are required",
+    });
+  }
+
+  const result = moveIssueSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Invalid issue move data",
+      errors: result.error.flatten().fieldErrors,
+    });
+  }
+
+  const { status, position } = result.data;
+
+  try {
+    const membership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: req.userId,
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(403).json({
+        message: "You do not have access to this workspace",
+      });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        workspaceId,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    if (project.status === "ARCHIVED") {
+      return res.status(400).json({
+        message: "Cannot move issues in an archived project",
+      });
+    }
+
+    const issue = await prisma.issue.findFirst({
+      where: {
+        id: issueId,
+        projectId,
+      },
+    });
+
+    if (!issue) {
+      return res.status(404).json({
+        message: "Issue not found",
+      });
+    }
+
+    const movedIssue = await prisma.$transaction(async (tx) => {
+      await tx.issue.updateMany({
+        where: {
+          projectId,
+          status,
+          id: {
+            not: issueId,
+          },
+          position: {
+            gte: position,
+          },
+        },
+        data: {
+          position: {
+            increment: 1,
+          },
+        },
+      });
+
+      return tx.issue.update({
+        where: {
+          id: issueId,
+        },
+        data: {
+          status,
+          position,
+        },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+    });
+
+    return res.status(200).json({
+      message: "Issue moved successfully",
+      issue: movedIssue,
+    });
+  } catch (error) {
+    console.error("Issue move failed:", error);
+
+    return res.status(500).json({
+      message: "Unable to move issue",
     });
   }
 }

@@ -62,3 +62,11 @@ export const updateIssueSchema = z
   );
 
 export type UpdateIssueInput = z.infer<typeof updateIssueSchema>;
+
+export const moveIssueSchema = z.object({
+  status: z.enum(["TODO", "IN_PROGRESS", "DONE"]),
+
+  position: z.number().int().min(0, "Position must be zero or greater"),
+});
+
+export type MoveIssueInput = z.infer<typeof moveIssueSchema>;

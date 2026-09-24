@@ -4,6 +4,7 @@ import {
   createIssue,
   getIssueById,
   getIssues,
+  moveIssue,
   updateIssue,
 } from "../controllers/issue.controller.js";
 
@@ -20,5 +21,7 @@ router.post("/", requireAuth, createIssue);
 router.get("/:issueId", requireAuth, getIssueById);
 
 router.patch("/:issueId", requireAuth, updateIssue);
+
+router.patch("/:issueId/move", requireAuth, moveIssue);
 
 export default router;
