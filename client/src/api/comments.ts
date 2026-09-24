@@ -70,6 +70,7 @@ export async function createComment(
   projectId: string,
   issueId: string,
   body: string,
+  mentionedUserIds: string[],
   accessToken: string,
 ): Promise<IssueComment> {
   const response = await fetch(
@@ -87,6 +88,7 @@ export async function createComment(
 
       body: JSON.stringify({
         body,
+        mentionedUserIds,
       }),
     },
   );

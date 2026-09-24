@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
   createComment,
@@ -10,17 +10,16 @@ import {
 
 import type { Issue } from "../../api/issues";
 
+import { getWorkspaceById, type WorkspaceMember } from "../../api/workspaces";
+
 import { getSocket } from "../../socket/socket";
 
 type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
 interface CommentsPanelProps {
   workspaceId: string;
-
   projectId: string;
-
   issue: Issue;
-
   accessToken: string;
 
   currentUserId: string | null;
@@ -43,8 +42,11 @@ function getInitials(name: string) {
 function formatDate(date: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
+
     day: "numeric",
+
     hour: "numeric",
+
     minute: "2-digit",
   }).format(new Date(date));
 }
@@ -66,7 +68,13 @@ function CommentsPanel({
 }: CommentsPanelProps) {
   const [comments, setComments] = useState<IssueComment[]>([]);
 
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+
   const [body, setBody] = useState("");
+
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
+
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
 
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
@@ -82,31 +90,51 @@ function CommentsPanel({
 
   const [error, setError] = useState<string | null>(null);
 
+  const mentionCandidates = useMemo(() => {
+    if (mentionQuery === null) {
+      return [];
+    }
+
+    const normalizedQuery = mentionQuery.trim().toLowerCase();
+
+    return members
+      .filter((member) => member.user.id !== currentUserId)
+      .filter(
+        (member) =>
+          member.user.name.toLowerCase().includes(normalizedQuery) ||
+          member.user.email.toLowerCase().includes(normalizedQuery),
+      )
+      .slice(0, 5);
+  }, [members, mentionQuery, currentUserId]);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadComments() {
+    async function loadDiscussion() {
       try {
         setLoading(true);
 
         setError(null);
 
-        const data = await getComments(
-          workspaceId,
-          projectId,
-          issue.id,
-          accessToken,
-        );
+        const [commentData, workspaceData] = await Promise.all([
+          getComments(workspaceId, projectId, issue.id, accessToken),
 
-        if (!cancelled) {
-          setComments(sortComments(data));
+          getWorkspaceById(workspaceId, accessToken),
+        ]);
+
+        if (cancelled) {
+          return;
         }
+
+        setComments(sortComments(commentData));
+
+        setMembers(workspaceData.members);
       } catch (loadError) {
         if (!cancelled) {
           setError(
             loadError instanceof Error
               ? loadError.message
-              : "Unable to load comments",
+              : "Unable to load discussion",
           );
         }
       } finally {
@@ -116,7 +144,7 @@ function CommentsPanel({
       }
     }
 
-    void loadComments();
+    void loadDiscussion();
 
     return () => {
       cancelled = true;
@@ -202,10 +230,6 @@ function CommentsPanel({
       setComments((currentComments) =>
         currentComments.filter((comment) => comment.id !== payload.commentId),
       );
-
-      setEditingCommentId((currentId) =>
-        currentId === payload.commentId ? null : currentId,
-      );
     }
 
     socket.on("comment:created", handleCommentCreated);
@@ -243,6 +267,48 @@ function CommentsPanel({
     });
   }
 
+  function handleBodyChange(value: string) {
+    setBody(value);
+
+    setError(null);
+
+    const match = value.match(/(?:^|\s)@([^\s@]*)$/);
+
+    if (!match) {
+      setMentionQuery(null);
+
+      return;
+    }
+
+    setMentionQuery(match[1] ?? "");
+  }
+
+  function handleSelectMention(member: WorkspaceMember) {
+    const match = body.match(/(?:^|\s)@([^\s@]*)$/);
+
+    if (!match || match.index === undefined) {
+      return;
+    }
+
+    const matchedText = match[0];
+
+    const leadingWhitespace = matchedText.startsWith(" ") ? " " : "";
+
+    const prefix = body.slice(0, match.index);
+
+    const updatedBody = `${prefix}${leadingWhitespace}@${member.user.name} `;
+
+    setBody(updatedBody);
+
+    setMentionedUserIds((currentIds) =>
+      currentIds.includes(member.user.id)
+        ? currentIds
+        : [...currentIds, member.user.id],
+    );
+
+    setMentionQuery(null);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -259,11 +325,24 @@ function CommentsPanel({
 
       setError(null);
 
+      const validMentionIds = mentionedUserIds.filter((userId) => {
+        const member = members.find(
+          (workspaceMember) => workspaceMember.user.id === userId,
+        );
+
+        if (!member) {
+          return false;
+        }
+
+        return body.includes(`@${member.user.name}`);
+      });
+
       const comment = await createComment(
         workspaceId,
         projectId,
         issue.id,
         trimmedBody,
+        validMentionIds,
         accessToken,
       );
 
@@ -272,6 +351,10 @@ function CommentsPanel({
       );
 
       setBody("");
+
+      setMentionedUserIds([]);
+
+      setMentionQuery(null);
 
       emitCommentMutation("comment:created", comment.id);
     } catch (submitError) {
@@ -396,22 +479,15 @@ function CommentsPanel({
             {issue.title}
           </h2>
 
-          <div className="mt-2 flex items-center gap-3">
-            <p className="text-sm text-slate-500">
-              {comments.length} {comments.length === 1 ? "comment" : "comments"}
-            </p>
-
-            <span className="flex items-center gap-1.5 text-xs text-emerald-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              Live
-            </span>
-          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            {comments.length} {comments.length === 1 ? "comment" : "comments"}
+          </p>
         </div>
 
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800"
+          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
         >
           Close
         </button>
@@ -428,9 +504,9 @@ function CommentsPanel({
           {loading ? (
             <p className="text-sm text-slate-500">Loading comments...</p>
           ) : comments.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center">
-              <p className="text-sm text-slate-400">No comments yet.</p>
-            </div>
+            <p className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-500">
+              No comments yet.
+            </p>
           ) : (
             <div className="space-y-4">
               {comments.map((comment) => {
@@ -450,7 +526,7 @@ function CommentsPanel({
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-300">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-300">
                           {getInitials(comment.author.name)}
                         </div>
 
@@ -459,27 +535,19 @@ function CommentsPanel({
                             {comment.author.name}
                           </p>
 
-                          <div className="flex items-center gap-2">
-                            <time className="text-xs text-slate-500">
-                              {formatDate(comment.createdAt)}
-                            </time>
-
-                            {comment.updatedAt !== comment.createdAt && (
-                              <span className="text-xs text-slate-600">
-                                edited
-                              </span>
-                            )}
-                          </div>
+                          <time className="text-xs text-slate-500">
+                            {formatDate(comment.createdAt)}
+                          </time>
                         </div>
                       </div>
 
                       {!isEditing && (
-                        <div className="flex items-center gap-3">
+                        <div className="flex gap-3">
                           {isAuthor && (
                             <button
                               type="button"
                               onClick={() => handleStartEdit(comment)}
-                              className="text-xs font-medium text-cyan-400 transition hover:text-cyan-300"
+                              className="text-xs text-cyan-400"
                             >
                               Edit
                             </button>
@@ -492,7 +560,7 @@ function CommentsPanel({
                               onClick={() => {
                                 void handleDelete(comment);
                               }}
-                              className="text-xs font-medium text-red-400 transition hover:text-red-300 disabled:opacity-50"
+                              className="text-xs text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {deletingId === comment.id
                                 ? "Deleting..."
@@ -510,44 +578,33 @@ function CommentsPanel({
                           onChange={(event) =>
                             setEditingBody(event.target.value)
                           }
-                          maxLength={5000}
                           rows={5}
-                          className="w-full resize-y rounded-lg border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-white outline-none focus:border-cyan-500"
+                          className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3 text-sm text-white"
                         />
 
-                        <div className="mt-3 flex items-center justify-between">
-                          <span className="text-xs text-slate-500">
-                            {editingBody.length}
-                            /5000
-                          </span>
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300"
+                          >
+                            Cancel
+                          </button>
 
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={savingEdit}
-                              onClick={handleCancelEdit}
-                              className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800"
-                            >
-                              Cancel
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={
-                                savingEdit || editingBody.trim().length === 0
-                              }
-                              onClick={() => {
-                                void handleSaveEdit(comment);
-                              }}
-                              className="rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-40"
-                            >
-                              {savingEdit ? "Saving..." : "Save"}
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleSaveEdit(comment);
+                            }}
+                            disabled={savingEdit}
+                            className="rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950"
+                          >
+                            Save
+                          </button>
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-300">
                         {comment.body}
                       </p>
                     )}
@@ -560,7 +617,7 @@ function CommentsPanel({
 
         <form
           onSubmit={handleSubmit}
-          className="h-fit rounded-xl border border-slate-800 bg-slate-950/50 p-4"
+          className="relative h-fit rounded-xl border border-slate-800 bg-slate-950/50 p-4"
         >
           <label
             htmlFor="comment-body"
@@ -572,30 +629,53 @@ function CommentsPanel({
           <textarea
             id="comment-body"
             value={body}
-            maxLength={5000}
-            onChange={(event) => {
-              setBody(event.target.value);
-
-              setError(null);
-            }}
+            onChange={(event) => handleBodyChange(event.target.value)}
             rows={6}
-            placeholder="Share an update, question, or note..."
-            className="mt-3 w-full resize-y rounded-lg border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-500"
+            maxLength={5000}
+            placeholder="Write @ to mention a teammate..."
+            className="mt-3 w-full resize-y rounded-lg border border-slate-700 bg-slate-900 p-3 text-sm text-white outline-none focus:border-cyan-500"
           />
 
-          <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+          {mentionQuery !== null && mentionCandidates.length > 0 && (
+            <div className="absolute left-4 right-4 z-20 mt-1 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl">
+              {mentionCandidates.map((member) => (
+                <button
+                  key={member.user.id}
+                  type="button"
+                  onClick={() => handleSelectMention(member)}
+                  className="flex w-full items-center gap-3 border-b border-slate-800 px-4 py-3 text-left last:border-b-0 hover:bg-slate-800"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-300">
+                    {getInitials(member.user.name)}
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      {member.user.name}
+                    </p>
+
+                    <p className="text-xs text-slate-500">
+                      {member.user.email}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-2 flex justify-between text-xs text-slate-500">
             <span>
               {body.length}
               /5000
             </span>
 
-            <span>Updates live</span>
+            <span>Type @ to mention</span>
           </div>
 
           <button
             type="submit"
             disabled={submitting || body.trim().length === 0}
-            className="mt-4 w-full rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-4 w-full rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-40"
           >
             {submitting ? "Posting..." : "Post Comment"}
           </button>

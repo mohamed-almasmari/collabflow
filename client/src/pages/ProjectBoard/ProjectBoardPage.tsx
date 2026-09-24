@@ -25,8 +25,8 @@ import {
   type WorkspaceMember,
 } from "../../api/workspaces";
 
-import ActivityTimeline from "../../components/activity/ActivityTimeline";
-import CommentsPanel from "../../components/comments/CommentsPanel";
+import ActivityTimeline from "../../components/Activity/ActivityTimeline";
+import CommentsPanel from "../../components/Comments/CommentsPanel";
 import CreateIssueForm from "../../components/kanban/CreateIssueForm";
 import EditIssueForm from "../../components/kanban/EditIssueForm";
 import KanbanBoard from "../../components/kanban/KanbanBoard";
