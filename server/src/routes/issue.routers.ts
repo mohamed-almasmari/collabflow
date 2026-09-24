@@ -11,6 +11,8 @@ import {
 
 import { requireAuth } from "../middleware/auth.middleware.js";
 
+import { recordIssueActivity } from "../middleware/issueActivity.middleware.js";
+
 import { requireCurrentIssueVersion } from "../middleware/issueConflict.middleware.js";
 
 const router = Router({
@@ -19,14 +21,30 @@ const router = Router({
 
 router.get("/", requireAuth, getIssues);
 
-router.post("/", requireAuth, createIssue);
+router.post("/", requireAuth, recordIssueActivity("CREATED"), createIssue);
 
-router.patch("/:issueId/move", requireAuth, moveIssue);
+router.patch(
+  "/:issueId/move",
+  requireAuth,
+  recordIssueActivity("MOVED"),
+  moveIssue,
+);
 
 router.get("/:issueId", requireAuth, getIssueById);
 
-router.patch("/:issueId", requireAuth, requireCurrentIssueVersion, updateIssue);
+router.patch(
+  "/:issueId",
+  requireAuth,
+  requireCurrentIssueVersion,
+  recordIssueActivity("UPDATED"),
+  updateIssue,
+);
 
-router.delete("/:issueId", requireAuth, deleteIssue);
+router.delete(
+  "/:issueId",
+  requireAuth,
+  recordIssueActivity("DELETED"),
+  deleteIssue,
+);
 
 export default router;

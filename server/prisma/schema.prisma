@@ -98,12 +98,10 @@ model Project {
   name        String
   description String?
   status      ProjectStatus @default(ACTIVE)
-
   workspaceId String
   createdById String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User      @relation("ProjectCreator", fields: [createdById], references: [id])
@@ -138,4 +136,26 @@ model Issue {
   @@index([assigneeId])
   @@index([status])
   @@index([projectId, status, position])
+}
+
+model ActivityLog {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  workspaceId String  @map("workspace_id")
+  projectId   String  @map("project_id")
+  issueId     String? @map("issue_id")
+  actorId     String  @map("actor_id")
+
+  action  String
+  details Json?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([workspaceId], map: "activity_log_workspace_id_idx")
+  @@index([projectId], map: "activity_log_project_id_idx")
+  @@index([issueId], map: "activity_log_issue_id_idx")
+  @@index([actorId], map: "activity_log_actor_id_idx")
+  @@index([createdAt], map: "activity_log_created_at_idx")
+  @@index([projectId, createdAt], map: "activity_log_project_created_at_idx")
+  @@map("activity_log")
 }
