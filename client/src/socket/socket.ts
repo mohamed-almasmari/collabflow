@@ -1,5 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 
+import type { IssueComment } from "../api/comments";
+
 import type { Issue } from "../api/issues";
 
 export interface PresenceUser {
@@ -27,8 +29,13 @@ interface IssueMutationPayload extends ProjectRoomPayload {
   issueId: string;
 }
 
+interface CommentMutationPayload extends IssueMutationPayload {
+  commentId: string;
+}
+
 interface IssueActivityInput extends IssueMutationPayload {
   activity: IssueActivityType;
+
   active: boolean;
 }
 
@@ -40,14 +47,29 @@ interface IssueDeletedPayload extends ProjectRoomPayload {
   issueId: string;
 }
 
+interface CommentRealtimePayload extends ProjectRoomPayload {
+  issueId: string;
+
+  comment: IssueComment;
+}
+
+interface CommentDeletedPayload extends ProjectRoomPayload {
+  issueId: string;
+
+  commentId: string;
+}
+
 interface PresencePayload extends ProjectRoomPayload {
   users: PresenceUser[];
 }
 
 interface IssueActivityPayload extends ProjectRoomPayload {
   issueId: string;
+
   activity: IssueActivityType;
+
   active: boolean;
+
   user: PresenceUser;
 }
 
@@ -65,6 +87,10 @@ interface ServerToClientEvents {
   "issue:deleted": (payload: IssueDeletedPayload) => void;
 
   "issue:activity": (payload: IssueActivityPayload) => void;
+
+  "comment:created": (payload: CommentRealtimePayload) => void;
+
+  "comment:deleted": (payload: CommentDeletedPayload) => void;
 
   "presence:updated": (payload: PresencePayload) => void;
 
@@ -85,6 +111,10 @@ interface ClientToServerEvents {
   "issue:deleted": (payload: IssueDeletedPayload) => void;
 
   "issue:activity": (payload: IssueActivityInput) => void;
+
+  "comment:created": (payload: CommentMutationPayload) => void;
+
+  "comment:deleted": (payload: CommentMutationPayload) => void;
 }
 
 export type CollabFlowSocket = Socket<

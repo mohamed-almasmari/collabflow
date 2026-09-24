@@ -15,6 +15,10 @@ interface IssueMutationPayload extends ProjectRoomPayload {
   issueId: string;
 }
 
+interface CommentMutationPayload extends IssueMutationPayload {
+  commentId: string;
+}
+
 type IssueActivityType = "EDITING" | "DRAGGING";
 
 interface IssueActivityInput extends IssueMutationPayload {
@@ -50,12 +54,33 @@ interface RealtimeIssue {
   assignee: RealtimeIssueUser | null;
 }
 
+interface RealtimeComment {
+  id: string;
+  body: string;
+  issueId: string;
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+
+  author: RealtimeIssueUser;
+}
+
 interface IssueRealtimePayload extends ProjectRoomPayload {
   issue: RealtimeIssue;
 }
 
 interface IssueDeletedPayload extends ProjectRoomPayload {
   issueId: string;
+}
+
+interface CommentRealtimePayload extends ProjectRoomPayload {
+  issueId: string;
+  comment: RealtimeComment;
+}
+
+interface CommentDeletedPayload extends ProjectRoomPayload {
+  issueId: string;
+  commentId: string;
 }
 
 interface PresenceUser {
@@ -70,11 +95,8 @@ interface PresencePayload extends ProjectRoomPayload {
 
 interface IssueActivityPayload extends ProjectRoomPayload {
   issueId: string;
-
   activity: IssueActivityType;
-
   active: boolean;
-
   user: PresenceUser;
 }
 
@@ -98,6 +120,10 @@ interface ServerToClientEvents {
 
   "issue:activity": (payload: IssueActivityPayload) => void;
 
+  "comment:created": (payload: CommentRealtimePayload) => void;
+
+  "comment:deleted": (payload: CommentDeletedPayload) => void;
+
   "presence:updated": (payload: PresencePayload) => void;
 
   "socket:error": (payload: SocketErrorPayload) => void;
@@ -117,6 +143,10 @@ interface ClientToServerEvents {
   "issue:deleted": (payload: IssueDeletedPayload) => void;
 
   "issue:activity": (payload: IssueActivityInput) => void;
+
+  "comment:created": (payload: CommentMutationPayload) => void;
+
+  "comment:deleted": (payload: CommentMutationPayload) => void;
 }
 
 interface SocketData {
@@ -155,6 +185,14 @@ function isValidIssuePayload(payload: IssueMutationPayload) {
     isValidProjectPayload(payload) &&
     typeof payload.issueId === "string" &&
     payload.issueId.trim(),
+  );
+}
+
+function isValidCommentPayload(payload: CommentMutationPayload) {
+  return Boolean(
+    isValidIssuePayload(payload) &&
+    typeof payload.commentId === "string" &&
+    payload.commentId.trim(),
   );
 }
 
@@ -285,7 +323,9 @@ async function getRealtimeIssue(
 
   return {
     id: issue.id,
+
     title: issue.title,
+
     description: issue.description,
 
     status: issue.status,
@@ -310,6 +350,63 @@ async function getRealtimeIssue(
   };
 }
 
+async function getRealtimeComment(
+  workspaceId: string,
+  projectId: string,
+  issueId: string,
+  commentId: string,
+): Promise<RealtimeComment | null> {
+  const comment = await prisma.comment.findFirst({
+    where: {
+      id: commentId,
+
+      issueId,
+
+      issue: {
+        id: issueId,
+
+        project: {
+          id: projectId,
+
+          workspaceId,
+        },
+      },
+    },
+
+    include: {
+      author: {
+        select: {
+          id: true,
+
+          name: true,
+
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!comment) {
+    return null;
+  }
+
+  return {
+    id: comment.id,
+
+    body: comment.body,
+
+    issueId: comment.issueId,
+
+    authorId: comment.authorId,
+
+    createdAt: comment.createdAt.toISOString(),
+
+    updatedAt: comment.updatedAt.toISOString(),
+
+    author: comment.author,
+  };
+}
+
 function isAuthorizedRoom(
   socket: CollabFlowSocket,
   workspaceId: string,
@@ -331,6 +428,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
   >(httpServer, {
     cors: {
       origin: clientOrigin,
+
       credentials: true,
     },
   });
@@ -351,6 +449,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
       uniqueUsers.set(userId, {
         id: userId,
+
         name,
         email,
       });
@@ -367,7 +466,11 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
   }
 
-  function emitActivity(socket: CollabFlowSocket, payload: IssueActivityInput) {
+  function emitActivity(
+    socket: CollabFlowSocket,
+
+    payload: IssueActivityInput,
+  ) {
     const room = getProjectRoom(payload.workspaceId, payload.projectId);
 
     socket.to(room).emit("issue:activity", {
@@ -410,7 +513,9 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
         select: {
           id: true,
+
           name: true,
+
           email: true,
         },
       });
@@ -475,6 +580,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
         if (
           !projectAlreadyJoined(
             socket.data.joinedProjects,
+
             payload.workspaceId,
             payload.projectId,
           )
@@ -674,6 +780,59 @@ export function initializeSocketServer(httpServer: HttpServer) {
         projectId: payload.projectId,
 
         issueId: payload.issueId,
+      });
+    });
+
+    socket.on("comment:created", async (payload) => {
+      if (
+        !isValidCommentPayload(payload) ||
+        !isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)
+      ) {
+        return;
+      }
+
+      const comment = await getRealtimeComment(
+        payload.workspaceId,
+        payload.projectId,
+        payload.issueId,
+        payload.commentId,
+      );
+
+      if (!comment) {
+        return;
+      }
+
+      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+      socket.to(room).emit("comment:created", {
+        workspaceId: payload.workspaceId,
+
+        projectId: payload.projectId,
+
+        issueId: payload.issueId,
+
+        comment,
+      });
+    });
+
+    socket.on("comment:deleted", (payload) => {
+      if (
+        !isValidCommentPayload(payload) ||
+        !isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)
+      ) {
+        return;
+      }
+
+      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+      socket.to(room).emit("comment:deleted", {
+        workspaceId: payload.workspaceId,
+
+        projectId: payload.projectId,
+
+        issueId: payload.issueId,
+
+        commentId: payload.commentId,
       });
     });
 

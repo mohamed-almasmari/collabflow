@@ -9,11 +9,17 @@ import {
 
 import type { Issue } from "../../api/issues";
 
+import { getSocket } from "../../socket/socket";
+
 interface CommentsPanelProps {
   workspaceId: string;
+
   projectId: string;
+
   issue: Issue;
+
   accessToken: string;
+
   onClose: () => void;
 }
 
@@ -30,10 +36,19 @@ function getInitials(name: string) {
 function formatDate(date: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
+
     day: "numeric",
+
     hour: "numeric",
+
     minute: "2-digit",
   }).format(new Date(date));
+}
+
+function sortComments(comments: IssueComment[]) {
+  return [...comments].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
 }
 
 function CommentsPanel({
@@ -61,6 +76,7 @@ function CommentsPanel({
     async function loadComments() {
       try {
         setLoading(true);
+
         setError(null);
 
         const data = await getComments(
@@ -71,7 +87,7 @@ function CommentsPanel({
         );
 
         if (!cancelled) {
-          setComments(data);
+          setComments(sortComments(data));
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -94,6 +110,104 @@ function CommentsPanel({
       cancelled = true;
     };
   }, [workspaceId, projectId, issue.id, accessToken]);
+
+  useEffect(() => {
+    const socket = getSocket(accessToken);
+
+    function handleCommentCreated(payload: {
+      workspaceId: string;
+
+      projectId: string;
+
+      issueId: string;
+
+      comment: IssueComment;
+    }) {
+      if (
+        payload.workspaceId !== workspaceId ||
+        payload.projectId !== projectId ||
+        payload.issueId !== issue.id
+      ) {
+        return;
+      }
+
+      setComments((currentComments) => {
+        const exists = currentComments.some(
+          (comment) => comment.id === payload.comment.id,
+        );
+
+        if (exists) {
+          return currentComments;
+        }
+
+        return sortComments([...currentComments, payload.comment]);
+      });
+    }
+
+    function handleCommentDeleted(payload: {
+      workspaceId: string;
+
+      projectId: string;
+
+      issueId: string;
+
+      commentId: string;
+    }) {
+      if (
+        payload.workspaceId !== workspaceId ||
+        payload.projectId !== projectId ||
+        payload.issueId !== issue.id
+      ) {
+        return;
+      }
+
+      setComments((currentComments) =>
+        currentComments.filter((comment) => comment.id !== payload.commentId),
+      );
+    }
+
+    socket.on("comment:created", handleCommentCreated);
+
+    socket.on("comment:deleted", handleCommentDeleted);
+
+    return () => {
+      socket.off("comment:created", handleCommentCreated);
+
+      socket.off("comment:deleted", handleCommentDeleted);
+    };
+  }, [workspaceId, projectId, issue.id, accessToken]);
+
+  function emitCommentCreated(commentId: string) {
+    const socket = getSocket(accessToken);
+
+    if (!socket.connected) {
+      return;
+    }
+
+    socket.emit("comment:created", {
+      workspaceId,
+      projectId,
+      issueId: issue.id,
+
+      commentId,
+    });
+  }
+
+  function emitCommentDeleted(commentId: string) {
+    const socket = getSocket(accessToken);
+
+    if (!socket.connected) {
+      return;
+    }
+
+    socket.emit("comment:deleted", {
+      workspaceId,
+      projectId,
+      issueId: issue.id,
+
+      commentId,
+    });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,9 +233,13 @@ function CommentsPanel({
         accessToken,
       );
 
-      setComments((currentComments) => [...currentComments, comment]);
+      setComments((currentComments) =>
+        sortComments([...currentComments, comment]),
+      );
 
       setBody("");
+
+      emitCommentCreated(comment.id);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -158,6 +276,8 @@ function CommentsPanel({
           (currentComment) => currentComment.id !== comment.id,
         ),
       );
+
+      emitCommentDeleted(comment.id);
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -181,9 +301,16 @@ function CommentsPanel({
             {issue.title}
           </h2>
 
-          <p className="mt-1 text-sm text-slate-500">
-            {comments.length} {comments.length === 1 ? "comment" : "comments"}
-          </p>
+          <div className="mt-2 flex items-center gap-3">
+            <p className="text-sm text-slate-500">
+              {comments.length} {comments.length === 1 ? "comment" : "comments"}
+            </p>
+
+            <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Live
+            </span>
+          </div>
         </div>
 
         <button
@@ -288,6 +415,8 @@ function CommentsPanel({
               {body.length}
               /5000
             </span>
+
+            <span>Updates live</span>
           </div>
 
           <button
