@@ -4,6 +4,8 @@ import type { IssueComment } from "../api/comments";
 
 import type { Issue } from "../api/issues";
 
+import type { Notification } from "../api/notifications";
+
 export interface PresenceUser {
   id: string;
   name: string;
@@ -93,6 +95,8 @@ interface ServerToClientEvents {
   "comment:updated": (payload: CommentRealtimePayload) => void;
 
   "comment:deleted": (payload: CommentDeletedPayload) => void;
+
+  "notification:created": (payload: Notification) => void;
 
   "presence:updated": (payload: PresencePayload) => void;
 

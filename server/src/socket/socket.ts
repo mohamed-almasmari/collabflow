@@ -26,7 +26,7 @@ interface IssueActivityInput extends IssueMutationPayload {
   active: boolean;
 }
 
-interface RealtimeIssueUser {
+interface RealtimeUser {
   id: string;
   name: string;
   email: string;
@@ -50,8 +50,8 @@ interface RealtimeIssue {
   createdAt: string;
   updatedAt: string;
 
-  createdBy: RealtimeIssueUser;
-  assignee: RealtimeIssueUser | null;
+  createdBy: RealtimeUser;
+  assignee: RealtimeUser | null;
 }
 
 interface RealtimeComment {
@@ -62,7 +62,48 @@ interface RealtimeComment {
   createdAt: string;
   updatedAt: string;
 
-  author: RealtimeIssueUser;
+  author: RealtimeUser;
+}
+
+interface RealtimeNotification {
+  id: string;
+
+  type: "COMMENT_MENTION";
+
+  recipientId: string;
+  actorId: string;
+
+  workspaceId: string;
+  projectId: string;
+  issueId: string;
+
+  commentId: string | null;
+
+  readAt: string | null;
+
+  createdAt: string;
+
+  actor: RealtimeUser;
+
+  workspace: {
+    id: string;
+    name: string;
+  };
+
+  project: {
+    id: string;
+    name: string;
+  };
+
+  issue: {
+    id: string;
+    title: string;
+  };
+
+  comment: {
+    id: string;
+    body: string;
+  } | null;
 }
 
 interface IssueRealtimePayload extends ProjectRoomPayload {
@@ -126,6 +167,8 @@ interface ServerToClientEvents {
 
   "comment:deleted": (payload: CommentDeletedPayload) => void;
 
+  "notification:created": (payload: RealtimeNotification) => void;
+
   "presence:updated": (payload: PresencePayload) => void;
 
   "socket:error": (payload: SocketErrorPayload) => void;
@@ -172,6 +215,10 @@ type CollabFlowSocket = Socket<
 
 function getProjectRoom(workspaceId: string, projectId: string) {
   return `workspace:${workspaceId}:project:${projectId}`;
+}
+
+function getUserRoom(userId: string) {
+  return `user:${userId}`;
 }
 
 function isValidProjectPayload(payload: ProjectRoomPayload) {
@@ -411,6 +458,88 @@ async function getRealtimeComment(
   };
 }
 
+async function getMentionNotifications(commentId: string) {
+  const notifications = await prisma.notification.findMany({
+    where: {
+      type: "COMMENT_MENTION",
+
+      commentId,
+    },
+
+    include: {
+      actor: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      workspace: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      issue: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+
+      comment: {
+        select: {
+          id: true,
+          body: true,
+        },
+      },
+    },
+  });
+
+  return notifications.map(
+    (notification): RealtimeNotification => ({
+      id: notification.id,
+
+      type: notification.type,
+
+      recipientId: notification.recipientId,
+
+      actorId: notification.actorId,
+
+      workspaceId: notification.workspaceId,
+
+      projectId: notification.projectId,
+
+      issueId: notification.issueId,
+
+      commentId: notification.commentId,
+
+      readAt: notification.readAt?.toISOString() ?? null,
+
+      createdAt: notification.createdAt.toISOString(),
+
+      actor: notification.actor,
+
+      workspace: notification.workspace,
+
+      project: notification.project,
+
+      issue: notification.issue,
+
+      comment: notification.comment,
+    }),
+  );
+}
+
 function isAuthorizedRoom(
   socket: CollabFlowSocket,
   workspaceId: string,
@@ -517,9 +646,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
         select: {
           id: true,
-
           name: true,
-
           email: true,
         },
       });
@@ -548,6 +675,8 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
   io.on("connection", (socket: CollabFlowSocket) => {
     console.log(`Socket connected: ${socket.id} user=${socket.data.userId}`);
+
+    void socket.join(getUserRoom(socket.data.userId));
 
     let disconnectedProjects: ProjectRoomPayload[] = [];
 
@@ -584,7 +713,6 @@ export function initializeSocketServer(httpServer: HttpServer) {
         if (
           !projectAlreadyJoined(
             socket.data.joinedProjects,
-
             payload.workspaceId,
             payload.projectId,
           )
@@ -620,7 +748,6 @@ export function initializeSocketServer(httpServer: HttpServer) {
       for (const activity of relatedActivities) {
         emitActivity(socket, {
           ...activity,
-
           active: false,
         });
       }
@@ -700,15 +827,15 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+      socket
+        .to(getProjectRoom(payload.workspaceId, payload.projectId))
+        .emit("issue:created", {
+          workspaceId: payload.workspaceId,
 
-      socket.to(room).emit("issue:created", {
-        workspaceId: payload.workspaceId,
+          projectId: payload.projectId,
 
-        projectId: payload.projectId,
-
-        issue,
-      });
+          issue,
+        });
     });
 
     socket.on("issue:updated", async (payload) => {
@@ -729,15 +856,15 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+      socket
+        .to(getProjectRoom(payload.workspaceId, payload.projectId))
+        .emit("issue:updated", {
+          workspaceId: payload.workspaceId,
 
-      socket.to(room).emit("issue:updated", {
-        workspaceId: payload.workspaceId,
+          projectId: payload.projectId,
 
-        projectId: payload.projectId,
-
-        issue,
-      });
+          issue,
+        });
     });
 
     socket.on("issue:moved", async (payload) => {
@@ -758,15 +885,15 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+      socket
+        .to(getProjectRoom(payload.workspaceId, payload.projectId))
+        .emit("issue:moved", {
+          workspaceId: payload.workspaceId,
 
-      socket.to(room).emit("issue:moved", {
-        workspaceId: payload.workspaceId,
+          projectId: payload.projectId,
 
-        projectId: payload.projectId,
-
-        issue,
-      });
+          issue,
+        });
     });
 
     socket.on("issue:deleted", (payload) => {
@@ -777,15 +904,15 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+      socket
+        .to(getProjectRoom(payload.workspaceId, payload.projectId))
+        .emit("issue:deleted", {
+          workspaceId: payload.workspaceId,
 
-      socket.to(room).emit("issue:deleted", {
-        workspaceId: payload.workspaceId,
+          projectId: payload.projectId,
 
-        projectId: payload.projectId,
-
-        issueId: payload.issueId,
-      });
+          issueId: payload.issueId,
+        });
     });
 
     socket.on("comment:created", async (payload) => {
@@ -807,17 +934,26 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+      socket
+        .to(getProjectRoom(payload.workspaceId, payload.projectId))
+        .emit("comment:created", {
+          workspaceId: payload.workspaceId,
 
-      socket.to(room).emit("comment:created", {
-        workspaceId: payload.workspaceId,
+          projectId: payload.projectId,
 
-        projectId: payload.projectId,
+          issueId: payload.issueId,
 
-        issueId: payload.issueId,
+          comment,
+        });
 
-        comment,
-      });
+      const notifications = await getMentionNotifications(payload.commentId);
+
+      for (const notification of notifications) {
+        io.to(getUserRoom(notification.recipientId)).emit(
+          "notification:created",
+          notification,
+        );
+      }
     });
 
     socket.on("comment:updated", async (payload) => {
@@ -839,17 +975,17 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+      socket
+        .to(getProjectRoom(payload.workspaceId, payload.projectId))
+        .emit("comment:updated", {
+          workspaceId: payload.workspaceId,
 
-      socket.to(room).emit("comment:updated", {
-        workspaceId: payload.workspaceId,
+          projectId: payload.projectId,
 
-        projectId: payload.projectId,
+          issueId: payload.issueId,
 
-        issueId: payload.issueId,
-
-        comment,
-      });
+          comment,
+        });
     });
 
     socket.on("comment:deleted", (payload) => {
@@ -860,17 +996,17 @@ export function initializeSocketServer(httpServer: HttpServer) {
         return;
       }
 
-      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+      socket
+        .to(getProjectRoom(payload.workspaceId, payload.projectId))
+        .emit("comment:deleted", {
+          workspaceId: payload.workspaceId,
 
-      socket.to(room).emit("comment:deleted", {
-        workspaceId: payload.workspaceId,
+          projectId: payload.projectId,
 
-        projectId: payload.projectId,
+          issueId: payload.issueId,
 
-        issueId: payload.issueId,
-
-        commentId: payload.commentId,
-      });
+          commentId: payload.commentId,
+        });
     });
 
     socket.on("disconnecting", () => {
@@ -883,27 +1019,28 @@ export function initializeSocketServer(httpServer: HttpServer) {
       console.log(`Socket disconnected: ${socket.id} (${reason})`);
 
       for (const activity of disconnectedActivities) {
-        const room = getProjectRoom(activity.workspaceId, activity.projectId);
+        io.to(getProjectRoom(activity.workspaceId, activity.projectId)).emit(
+          "issue:activity",
+          {
+            workspaceId: activity.workspaceId,
 
-        io.to(room).emit("issue:activity", {
-          workspaceId: activity.workspaceId,
+            projectId: activity.projectId,
 
-          projectId: activity.projectId,
+            issueId: activity.issueId,
 
-          issueId: activity.issueId,
+            activity: activity.activity,
 
-          activity: activity.activity,
+            active: false,
 
-          active: false,
+            user: {
+              id: socket.data.userId,
 
-          user: {
-            id: socket.data.userId,
+              name: socket.data.name,
 
-            name: socket.data.name,
-
-            email: socket.data.email,
+              email: socket.data.email,
+            },
           },
-        });
+        );
       }
 
       for (const project of disconnectedProjects) {

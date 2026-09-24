@@ -9,6 +9,8 @@ import {
   type Notification,
 } from "../../api/notifications";
 
+import { getSocket } from "../../socket/socket";
+
 interface NotificationBellProps {
   accessToken: string;
 }
@@ -71,6 +73,34 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
     void loadNotifications();
   }, [accessToken]);
 
+  useEffect(() => {
+    const socket = getSocket(accessToken);
+
+    function handleNotificationCreated(notification: Notification) {
+      setNotifications((currentNotifications) => {
+        const exists = currentNotifications.some(
+          (currentNotification) => currentNotification.id === notification.id,
+        );
+
+        if (exists) {
+          return currentNotifications;
+        }
+
+        return [notification, ...currentNotifications].slice(0, 50);
+      });
+
+      setUnreadCount(
+        (currentCount) => currentCount + (notification.readAt ? 0 : 1),
+      );
+    }
+
+    socket.on("notification:created", handleNotificationCreated);
+
+    return () => {
+      socket.off("notification:created", handleNotificationCreated);
+    };
+  }, [accessToken]);
+
   async function handleNotificationClick(notification: Notification) {
     try {
       if (!notification.readAt) {
@@ -108,6 +138,8 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
 
   async function handleMarkAllRead() {
     try {
+      setError(null);
+
       const result = await markAllNotificationsRead(accessToken);
 
       setUnreadCount(result.unreadCount);
@@ -193,6 +225,10 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-sm text-slate-400">No notifications yet.</p>
+
+                <p className="mt-1 text-xs text-slate-600">
+                  Mentions will appear here.
+                </p>
               </div>
             ) : (
               notifications.map((notification) => (
@@ -220,6 +256,11 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
                     <div className="min-w-0">
                       <p className="text-sm leading-5 text-slate-200">
                         {getNotificationText(notification)}
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        {notification.workspace.name} ·{" "}
+                        {notification.project.name}
                       </p>
 
                       {notification.comment && (
