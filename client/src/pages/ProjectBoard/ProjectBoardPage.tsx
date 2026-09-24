@@ -28,6 +28,8 @@ import KanbanBoard from "../../components/kanban/KanbanBoard";
 
 import { useAuth } from "../../hooks/useAuth";
 
+import { getSocket } from "../../socket/socket";
+
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
 
@@ -83,15 +85,17 @@ function ProjectBoardPage() {
           ),
         ]);
 
-        if (!cancelled) {
-          setIssues(issueData);
-
-          setMembers(workspaceData.members);
-
-          setWorkspace(workspaceData);
-
-          setProject(projectData);
+        if (cancelled) {
+          return;
         }
+
+        setIssues(issueData);
+
+        setMembers(workspaceData.members);
+
+        setWorkspace(workspaceData);
+
+        setProject(projectData);
       } catch (error) {
         if (!cancelled) {
           setError(
@@ -114,6 +118,75 @@ function ProjectBoardPage() {
     };
   }, [workspaceId, projectId, accessToken]);
 
+  useEffect(() => {
+    if (!workspaceId || !projectId || !accessToken) {
+      return;
+    }
+
+    const currentWorkspaceId = workspaceId;
+
+    const currentProjectId = projectId;
+
+    const currentAccessToken = accessToken;
+
+    const socket = getSocket();
+
+    const roomPayload = {
+      workspaceId: currentWorkspaceId,
+
+      projectId: currentProjectId,
+    };
+
+    socket.emit("project:join", roomPayload);
+
+    async function handleBoardRefresh(payload: {
+      workspaceId: string;
+      projectId: string;
+    }) {
+      if (
+        payload.workspaceId !== currentWorkspaceId ||
+        payload.projectId !== currentProjectId
+      ) {
+        return;
+      }
+
+      try {
+        const refreshedIssues = await getIssues(
+          currentWorkspaceId,
+          currentProjectId,
+          currentAccessToken,
+        );
+
+        setIssues(refreshedIssues);
+      } catch (error) {
+        setError(
+          error instanceof Error ? error.message : "Unable to refresh board",
+        );
+      }
+    }
+
+    socket.on("board:refresh", handleBoardRefresh);
+
+    return () => {
+      socket.off("board:refresh", handleBoardRefresh);
+
+      socket.emit("project:leave", roomPayload);
+    };
+  }, [workspaceId, projectId, accessToken]);
+
+  function broadcastBoardChange() {
+    if (!workspaceId || !projectId) {
+      return;
+    }
+
+    const socket = getSocket();
+
+    socket.emit("board:changed", {
+      workspaceId,
+      projectId,
+    });
+  }
+
   async function handleCreateIssue(input: CreateIssueInput) {
     if (!workspaceId || !projectId || !accessToken) {
       throw new Error("Unable to create issue");
@@ -129,6 +202,8 @@ function ProjectBoardPage() {
     setIssues((currentIssues) => [...currentIssues, newIssue]);
 
     setShowCreateForm(false);
+
+    broadcastBoardChange();
   }
 
   async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
@@ -151,6 +226,8 @@ function ProjectBoardPage() {
     );
 
     setEditingIssue(null);
+
+    broadcastBoardChange();
   }
 
   async function handleMoveIssue(
@@ -197,6 +274,8 @@ function ProjectBoardPage() {
       );
 
       setIssues(refreshedIssues);
+
+      broadcastBoardChange();
     } catch (error) {
       setIssues(previousIssues);
 
@@ -228,6 +307,8 @@ function ProjectBoardPage() {
       }
 
       setDeletingIssue(null);
+
+      broadcastBoardChange();
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Unable to delete issue",
@@ -294,8 +375,7 @@ function ProjectBoardPage() {
                 {project && (
                   <span
                     className={`
-                      rounded-full border px-3 py-1
-                      text-xs font-semibold
+                      rounded-full border px-3 py-1 text-xs font-semibold
                       ${
                         project.status === "ACTIVE"
                           ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
@@ -321,6 +401,8 @@ function ProjectBoardPage() {
                 <span>
                   {issues.length} {issues.length === 1 ? "issue" : "issues"}
                 </span>
+
+                <span className="text-emerald-400">Real-time connected</span>
               </div>
             </div>
 
