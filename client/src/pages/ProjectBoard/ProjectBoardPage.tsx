@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 import { getProjectActivity, type ActivityLog } from "../../api/activity";
 
@@ -27,10 +27,10 @@ import {
 
 import ActivityTimeline from "../../components/Activity/ActivityTimeline";
 import CommentsPanel from "../../components/Comments/CommentsPanel";
-import CreateIssueForm from "../../components/kanban/CreateIssueForm";
-import EditIssueForm from "../../components/kanban/EditIssueForm";
-import KanbanBoard from "../../components/kanban/KanbanBoard";
-import ProjectPresence from "../../components/kanban/ProjectPresence";
+import CreateIssueForm from "../../components/Kanban/CreateIssueForm";
+import EditIssueForm from "../../components/Kanban/EditIssueForm";
+import KanbanBoard from "../../components/Kanban/KanbanBoard";
+import ProjectPresence from "../../components/Kanban/ProjectPresence";
 
 import { useAuth } from "../../hooks/useAuth";
 
@@ -50,6 +50,8 @@ import {
 
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
+
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { accessToken, user } = useAuth();
 
@@ -158,6 +160,18 @@ function ProjectBoardPage() {
         setProject(projectData);
 
         setActivities(activityData);
+
+        const issueIdFromUrl = searchParams.get("issue");
+
+        if (issueIdFromUrl) {
+          const linkedIssue = issueData.find(
+            (issue) => issue.id === issueIdFromUrl,
+          );
+
+          if (linkedIssue) {
+            setDiscussionIssue(linkedIssue);
+          }
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -178,7 +192,7 @@ function ProjectBoardPage() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, projectId, accessToken]);
+  }, [workspaceId, projectId, accessToken, searchParams]);
 
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -205,7 +219,6 @@ function ProjectBoardPage() {
 
     function belongsToCurrentProject(payload: {
       workspaceId: string;
-
       projectId: string;
     }) {
       return (
@@ -250,9 +263,7 @@ function ProjectBoardPage() {
 
     function handlePresenceUpdated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       users: PresenceUser[];
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -264,15 +275,10 @@ function ProjectBoardPage() {
 
     function handleIssueActivity(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
-
       activity: IssueActivityType;
-
       active: boolean;
-
       user: PresenceUser;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -309,9 +315,7 @@ function ProjectBoardPage() {
 
     function handleIssueCreated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -327,9 +331,7 @@ function ProjectBoardPage() {
 
     function handleIssueUpdated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -349,9 +351,7 @@ function ProjectBoardPage() {
 
     function handleIssueMoved(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -371,9 +371,7 @@ function ProjectBoardPage() {
 
     function handleIssueDeleted(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -531,11 +529,7 @@ function ProjectBoardPage() {
     refreshActivitySoon();
   }
 
-  async function handleUpdateIssue(
-    issueId: string,
-
-    input: UpdateIssueInput,
-  ) {
+  async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
     if (!workspaceId || !projectId || !accessToken) {
       throw new Error("Unable to update issue");
     }
@@ -588,9 +582,7 @@ function ProjectBoardPage() {
 
   async function handleMoveIssue(
     issueId: string,
-
     status: IssueStatus,
-
     position: number,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -750,14 +742,20 @@ function ProjectBoardPage() {
   function handleOpenComments(issue: Issue) {
     setDiscussionIssue(issue);
 
+    setSearchParams({
+      issue: issue.id,
+    });
+
     setError(null);
   }
 
-  function handleDragActivity(
-    issueId: string,
+  function handleCloseComments() {
+    setDiscussionIssue(null);
 
-    active: boolean,
-  ) {
+    setSearchParams({});
+  }
+
+  function handleDragActivity(issueId: string, active: boolean) {
     emitIssueActivity(issueId, "DRAGGING", active);
   }
 
@@ -933,7 +931,7 @@ function ProjectBoardPage() {
             accessToken={accessToken}
             currentUserId={user?.id ?? null}
             currentUserRole={currentMembership?.role ?? null}
-            onClose={() => setDiscussionIssue(null)}
+            onClose={handleCloseComments}
           />
         )}
 

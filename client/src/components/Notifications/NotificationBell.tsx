@@ -18,11 +18,8 @@ interface NotificationBellProps {
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
-
     day: "numeric",
-
     hour: "numeric",
-
     minute: "2-digit",
   }).format(new Date(value));
 }
@@ -89,9 +86,9 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
         return [notification, ...currentNotifications].slice(0, 50);
       });
 
-      setUnreadCount(
-        (currentCount) => currentCount + (notification.readAt ? 0 : 1),
-      );
+      if (!notification.readAt) {
+        setUnreadCount((currentCount) => currentCount + 1);
+      }
     }
 
     socket.on("notification:created", handleNotificationCreated);
@@ -125,7 +122,7 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
       setOpen(false);
 
       navigate(
-        `/workspaces/${notification.workspaceId}/projects/${notification.projectId}/board`,
+        `/workspaces/${notification.workspaceId}/projects/${notification.projectId}/board?issue=${notification.issueId}`,
       );
     } catch (clickError) {
       setError(
