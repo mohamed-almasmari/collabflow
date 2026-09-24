@@ -51,7 +51,7 @@ import {
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
 
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
 
   const [issues, setIssues] = useState<Issue[]>([]);
 
@@ -123,6 +123,7 @@ function ProjectBoardPage() {
     async function loadBoard() {
       try {
         setLoading(true);
+
         setError(null);
 
         const [issueData, workspaceData, projectData, activityData] =
@@ -204,6 +205,7 @@ function ProjectBoardPage() {
 
     function belongsToCurrentProject(payload: {
       workspaceId: string;
+
       projectId: string;
     }) {
       return (
@@ -248,7 +250,9 @@ function ProjectBoardPage() {
 
     function handlePresenceUpdated(payload: {
       workspaceId: string;
+
       projectId: string;
+
       users: PresenceUser[];
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -260,10 +264,15 @@ function ProjectBoardPage() {
 
     function handleIssueActivity(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issueId: string;
+
       activity: IssueActivityType;
+
       active: boolean;
+
       user: PresenceUser;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -300,7 +309,9 @@ function ProjectBoardPage() {
 
     function handleIssueCreated(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -316,7 +327,9 @@ function ProjectBoardPage() {
 
     function handleIssueUpdated(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -336,7 +349,9 @@ function ProjectBoardPage() {
 
     function handleIssueMoved(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -356,7 +371,9 @@ function ProjectBoardPage() {
 
     function handleIssueDeleted(payload: {
       workspaceId: string;
+
       projectId: string;
+
       issueId: string;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -414,6 +431,7 @@ function ProjectBoardPage() {
       }
 
       setPresenceUsers([]);
+
       setIssueActivities([]);
 
       socket.off("connect", joinProjectRoom);
@@ -462,7 +480,9 @@ function ProjectBoardPage() {
 
   function emitIssueActivity(
     issueId: string,
+
     activity: IssueActivityType,
+
     active: boolean,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -511,7 +531,11 @@ function ProjectBoardPage() {
     refreshActivitySoon();
   }
 
-  async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
+  async function handleUpdateIssue(
+    issueId: string,
+
+    input: UpdateIssueInput,
+  ) {
     if (!workspaceId || !projectId || !accessToken) {
       throw new Error("Unable to update issue");
     }
@@ -564,7 +588,9 @@ function ProjectBoardPage() {
 
   async function handleMoveIssue(
     issueId: string,
+
     status: IssueStatus,
+
     position: number,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -727,9 +753,17 @@ function ProjectBoardPage() {
     setError(null);
   }
 
-  function handleDragActivity(issueId: string, active: boolean) {
+  function handleDragActivity(
+    issueId: string,
+
+    active: boolean,
+  ) {
     emitIssueActivity(issueId, "DRAGGING", active);
   }
+
+  const currentMembership = user
+    ? members.find((member) => member.user.id === user.id)
+    : undefined;
 
   if (loading) {
     return (
@@ -897,6 +931,8 @@ function ProjectBoardPage() {
             projectId={projectId}
             issue={discussionIssue}
             accessToken={accessToken}
+            currentUserId={user?.id ?? null}
+            currentUserRole={currentMembership?.role ?? null}
             onClose={() => setDiscussionIssue(null)}
           />
         )}

@@ -14,6 +14,20 @@ function getRouteParam(value: string | string[] | undefined): string | null {
   return value;
 }
 
+function getCommentBody(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const body = value.trim();
+
+  if (body.length < 1 || body.length > 5000) {
+    return null;
+  }
+
+  return body;
+}
+
 async function getIssueAccess(
   userId: string,
   workspaceId: string,
@@ -162,19 +176,11 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
       return;
     }
 
-    const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+    const body = getCommentBody(req.body?.body);
 
-    if (body.length < 1) {
+    if (!body) {
       res.status(400).json({
-        message: "Comment cannot be empty",
-      });
-
-      return;
-    }
-
-    if (body.length > 5000) {
-      res.status(400).json({
-        message: "Comment cannot exceed 5000 characters",
+        message: "Comment must be between 1 and 5000 characters",
       });
 
       return;
@@ -223,6 +229,121 @@ export async function createComment(req: AuthenticatedRequest, res: Response) {
 
     res.status(500).json({
       message: "Unable to create comment",
+    });
+  }
+}
+
+export async function updateComment(req: AuthenticatedRequest, res: Response) {
+  try {
+    const workspaceId = getRouteParam(req.params.workspaceId);
+
+    const projectId = getRouteParam(req.params.projectId);
+
+    const issueId = getRouteParam(req.params.issueId);
+
+    const commentId = getRouteParam(req.params.commentId);
+
+    const userId = req.userId;
+
+    if (!workspaceId || !projectId || !issueId || !commentId) {
+      res.status(400).json({
+        message: "Invalid identifier",
+      });
+
+      return;
+    }
+
+    if (!userId) {
+      res.status(401).json({
+        message: "Authentication required",
+      });
+
+      return;
+    }
+
+    const body = getCommentBody(req.body?.body);
+
+    if (!body) {
+      res.status(400).json({
+        message: "Comment must be between 1 and 5000 characters",
+      });
+
+      return;
+    }
+
+    const access = await getIssueAccess(
+      userId,
+      workspaceId,
+      projectId,
+      issueId,
+    );
+
+    if (!access) {
+      res.status(404).json({
+        message: "Issue not found or access denied",
+      });
+
+      return;
+    }
+
+    const existingComment = await prisma.comment.findFirst({
+      where: {
+        id: commentId,
+        issueId,
+      },
+
+      select: {
+        id: true,
+        authorId: true,
+      },
+    });
+
+    if (!existingComment) {
+      res.status(404).json({
+        message: "Comment not found",
+      });
+
+      return;
+    }
+
+    if (existingComment.authorId !== userId) {
+      res.status(403).json({
+        message: "You can only edit your own comments",
+      });
+
+      return;
+    }
+
+    const comment = await prisma.comment.update({
+      where: {
+        id: commentId,
+      },
+
+      data: {
+        body,
+      },
+
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    res.status(200).json({
+      message: "Comment updated successfully",
+
+      comment,
+    });
+  } catch (error) {
+    console.error("Unable to update comment:", error);
+
+    res.status(500).json({
+      message: "Unable to update comment",
     });
   }
 }

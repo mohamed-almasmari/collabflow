@@ -90,6 +90,8 @@ interface ServerToClientEvents {
 
   "comment:created": (payload: CommentRealtimePayload) => void;
 
+  "comment:updated": (payload: CommentRealtimePayload) => void;
+
   "comment:deleted": (payload: CommentDeletedPayload) => void;
 
   "presence:updated": (payload: PresencePayload) => void;
@@ -113,6 +115,8 @@ interface ClientToServerEvents {
   "issue:activity": (payload: IssueActivityInput) => void;
 
   "comment:created": (payload: CommentMutationPayload) => void;
+
+  "comment:updated": (payload: CommentMutationPayload) => void;
 
   "comment:deleted": (payload: CommentMutationPayload) => void;
 }

@@ -20,13 +20,21 @@ interface CommentsResponse {
   comments: IssueComment[];
 }
 
-interface CreateCommentResponse {
+interface CommentMutationResponse {
   message: string;
   comment: IssueComment;
 }
 
 interface ApiErrorResponse {
   message?: string;
+}
+
+async function getErrorMessage(response: Response, fallback: string) {
+  const data = (await response
+    .json()
+    .catch(() => null)) as ApiErrorResponse | null;
+
+  return data?.message ?? fallback;
 }
 
 export async function getComments(
@@ -49,11 +57,7 @@ export async function getComments(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
-
-    throw new Error(data?.message ?? "Unable to load comments");
+    throw new Error(await getErrorMessage(response, "Unable to load comments"));
   }
 
   const data: CommentsResponse = await response.json();
@@ -88,14 +92,50 @@ export async function createComment(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
-
-    throw new Error(data?.message ?? "Unable to create comment");
+    throw new Error(
+      await getErrorMessage(response, "Unable to create comment"),
+    );
   }
 
-  const data: CreateCommentResponse = await response.json();
+  const data: CommentMutationResponse = await response.json();
+
+  return data.comment;
+}
+
+export async function updateComment(
+  workspaceId: string,
+  projectId: string,
+  issueId: string,
+  commentId: string,
+  body: string,
+  accessToken: string,
+): Promise<IssueComment> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues/${issueId}/comments/${commentId}`,
+    {
+      method: "PATCH",
+
+      headers: {
+        "Content-Type": "application/json",
+
+        Authorization: `Bearer ${accessToken}`,
+      },
+
+      credentials: "include",
+
+      body: JSON.stringify({
+        body,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(response, "Unable to update comment"),
+    );
+  }
+
+  const data: CommentMutationResponse = await response.json();
 
   return data.comment;
 }
@@ -121,10 +161,8 @@ export async function deleteComment(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
-
-    throw new Error(data?.message ?? "Unable to delete comment");
+    throw new Error(
+      await getErrorMessage(response, "Unable to delete comment"),
+    );
   }
 }

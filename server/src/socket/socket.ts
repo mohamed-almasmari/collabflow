@@ -122,6 +122,8 @@ interface ServerToClientEvents {
 
   "comment:created": (payload: CommentRealtimePayload) => void;
 
+  "comment:updated": (payload: CommentRealtimePayload) => void;
+
   "comment:deleted": (payload: CommentDeletedPayload) => void;
 
   "presence:updated": (payload: PresencePayload) => void;
@@ -145,6 +147,8 @@ interface ClientToServerEvents {
   "issue:activity": (payload: IssueActivityInput) => void;
 
   "comment:created": (payload: CommentMutationPayload) => void;
+
+  "comment:updated": (payload: CommentMutationPayload) => void;
 
   "comment:deleted": (payload: CommentMutationPayload) => void;
 }
@@ -616,6 +620,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
       for (const activity of relatedActivities) {
         emitActivity(socket, {
           ...activity,
+
           active: false,
         });
       }
@@ -805,6 +810,38 @@ export function initializeSocketServer(httpServer: HttpServer) {
       const room = getProjectRoom(payload.workspaceId, payload.projectId);
 
       socket.to(room).emit("comment:created", {
+        workspaceId: payload.workspaceId,
+
+        projectId: payload.projectId,
+
+        issueId: payload.issueId,
+
+        comment,
+      });
+    });
+
+    socket.on("comment:updated", async (payload) => {
+      if (
+        !isValidCommentPayload(payload) ||
+        !isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)
+      ) {
+        return;
+      }
+
+      const comment = await getRealtimeComment(
+        payload.workspaceId,
+        payload.projectId,
+        payload.issueId,
+        payload.commentId,
+      );
+
+      if (!comment) {
+        return;
+      }
+
+      const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+      socket.to(room).emit("comment:updated", {
         workspaceId: payload.workspaceId,
 
         projectId: payload.projectId,

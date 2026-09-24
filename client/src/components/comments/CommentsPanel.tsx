@@ -4,12 +4,15 @@ import {
   createComment,
   deleteComment,
   getComments,
+  updateComment,
   type IssueComment,
 } from "../../api/comments";
 
 import type { Issue } from "../../api/issues";
 
 import { getSocket } from "../../socket/socket";
+
+type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
 interface CommentsPanelProps {
   workspaceId: string;
@@ -19,6 +22,10 @@ interface CommentsPanelProps {
   issue: Issue;
 
   accessToken: string;
+
+  currentUserId: string | null;
+
+  currentUserRole: WorkspaceRole | null;
 
   onClose: () => void;
 }
@@ -36,11 +43,8 @@ function getInitials(name: string) {
 function formatDate(date: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
-
     day: "numeric",
-
     hour: "numeric",
-
     minute: "2-digit",
   }).format(new Date(date));
 }
@@ -56,15 +60,23 @@ function CommentsPanel({
   projectId,
   issue,
   accessToken,
+  currentUserId,
+  currentUserRole,
   onClose,
 }: CommentsPanelProps) {
   const [comments, setComments] = useState<IssueComment[]>([]);
 
   const [body, setBody] = useState("");
 
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+
+  const [editingBody, setEditingBody] = useState("");
+
   const [loading, setLoading] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
+
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -114,6 +126,20 @@ function CommentsPanel({
   useEffect(() => {
     const socket = getSocket(accessToken);
 
+    function belongsToDiscussion(payload: {
+      workspaceId: string;
+
+      projectId: string;
+
+      issueId: string;
+    }) {
+      return (
+        payload.workspaceId === workspaceId &&
+        payload.projectId === projectId &&
+        payload.issueId === issue.id
+      );
+    }
+
     function handleCommentCreated(payload: {
       workspaceId: string;
 
@@ -123,11 +149,7 @@ function CommentsPanel({
 
       comment: IssueComment;
     }) {
-      if (
-        payload.workspaceId !== workspaceId ||
-        payload.projectId !== projectId ||
-        payload.issueId !== issue.id
-      ) {
+      if (!belongsToDiscussion(payload)) {
         return;
       }
 
@@ -144,6 +166,26 @@ function CommentsPanel({
       });
     }
 
+    function handleCommentUpdated(payload: {
+      workspaceId: string;
+
+      projectId: string;
+
+      issueId: string;
+
+      comment: IssueComment;
+    }) {
+      if (!belongsToDiscussion(payload)) {
+        return;
+      }
+
+      setComments((currentComments) =>
+        currentComments.map((comment) =>
+          comment.id === payload.comment.id ? payload.comment : comment,
+        ),
+      );
+    }
+
     function handleCommentDeleted(payload: {
       workspaceId: string;
 
@@ -153,54 +195,46 @@ function CommentsPanel({
 
       commentId: string;
     }) {
-      if (
-        payload.workspaceId !== workspaceId ||
-        payload.projectId !== projectId ||
-        payload.issueId !== issue.id
-      ) {
+      if (!belongsToDiscussion(payload)) {
         return;
       }
 
       setComments((currentComments) =>
         currentComments.filter((comment) => comment.id !== payload.commentId),
       );
+
+      setEditingCommentId((currentId) =>
+        currentId === payload.commentId ? null : currentId,
+      );
     }
 
     socket.on("comment:created", handleCommentCreated);
+
+    socket.on("comment:updated", handleCommentUpdated);
 
     socket.on("comment:deleted", handleCommentDeleted);
 
     return () => {
       socket.off("comment:created", handleCommentCreated);
 
+      socket.off("comment:updated", handleCommentUpdated);
+
       socket.off("comment:deleted", handleCommentDeleted);
     };
   }, [workspaceId, projectId, issue.id, accessToken]);
 
-  function emitCommentCreated(commentId: string) {
+  function emitCommentMutation(
+    event: "comment:created" | "comment:updated" | "comment:deleted",
+
+    commentId: string,
+  ) {
     const socket = getSocket(accessToken);
 
     if (!socket.connected) {
       return;
     }
 
-    socket.emit("comment:created", {
-      workspaceId,
-      projectId,
-      issueId: issue.id,
-
-      commentId,
-    });
-  }
-
-  function emitCommentDeleted(commentId: string) {
-    const socket = getSocket(accessToken);
-
-    if (!socket.connected) {
-      return;
-    }
-
-    socket.emit("comment:deleted", {
+    socket.emit(event, {
       workspaceId,
       projectId,
       issueId: issue.id,
@@ -239,7 +273,7 @@ function CommentsPanel({
 
       setBody("");
 
-      emitCommentCreated(comment.id);
+      emitCommentMutation("comment:created", comment.id);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -248,6 +282,67 @@ function CommentsPanel({
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function handleStartEdit(comment: IssueComment) {
+    setEditingCommentId(comment.id);
+
+    setEditingBody(comment.body);
+
+    setError(null);
+  }
+
+  function handleCancelEdit() {
+    setEditingCommentId(null);
+
+    setEditingBody("");
+  }
+
+  async function handleSaveEdit(comment: IssueComment) {
+    const trimmedBody = editingBody.trim();
+
+    if (!trimmedBody) {
+      setError("Comment cannot be empty");
+
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+
+      setError(null);
+
+      const updatedComment = await updateComment(
+        workspaceId,
+        projectId,
+        issue.id,
+        comment.id,
+        trimmedBody,
+        accessToken,
+      );
+
+      setComments((currentComments) =>
+        currentComments.map((currentComment) =>
+          currentComment.id === updatedComment.id
+            ? updatedComment
+            : currentComment,
+        ),
+      );
+
+      setEditingCommentId(null);
+
+      setEditingBody("");
+
+      emitCommentMutation("comment:updated", updatedComment.id);
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Unable to update comment",
+      );
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -277,7 +372,7 @@ function CommentsPanel({
         ),
       );
 
-      emitCommentDeleted(comment.id);
+      emitCommentMutation("comment:deleted", comment.id);
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -335,52 +430,130 @@ function CommentsPanel({
           ) : comments.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center">
               <p className="text-sm text-slate-400">No comments yet.</p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Start the discussion about this issue.
-              </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {comments.map((comment) => (
-                <article
-                  key={comment.id}
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-300">
-                        {getInitials(comment.author.name)}
+              {comments.map((comment) => {
+                const isAuthor = currentUserId === comment.authorId;
+
+                const canDelete =
+                  isAuthor ||
+                  currentUserRole === "OWNER" ||
+                  currentUserRole === "ADMIN";
+
+                const isEditing = editingCommentId === comment.id;
+
+                return (
+                  <article
+                    key={comment.id}
+                    className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-300">
+                          {getInitials(comment.author.name)}
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-semibold text-white">
+                            {comment.author.name}
+                          </p>
+
+                          <div className="flex items-center gap-2">
+                            <time className="text-xs text-slate-500">
+                              {formatDate(comment.createdAt)}
+                            </time>
+
+                            {comment.updatedAt !== comment.createdAt && (
+                              <span className="text-xs text-slate-600">
+                                edited
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          {comment.author.name}
-                        </p>
+                      {!isEditing && (
+                        <div className="flex items-center gap-3">
+                          {isAuthor && (
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(comment)}
+                              className="text-xs font-medium text-cyan-400 transition hover:text-cyan-300"
+                            >
+                              Edit
+                            </button>
+                          )}
 
-                        <time className="text-xs text-slate-500">
-                          {formatDate(comment.createdAt)}
-                        </time>
-                      </div>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              disabled={deletingId === comment.id}
+                              onClick={() => {
+                                void handleDelete(comment);
+                              }}
+                              className="text-xs font-medium text-red-400 transition hover:text-red-300 disabled:opacity-50"
+                            >
+                              {deletingId === comment.id
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={deletingId === comment.id}
-                      onClick={() => {
-                        void handleDelete(comment);
-                      }}
-                      className="text-xs font-medium text-red-400 transition hover:text-red-300 disabled:opacity-50"
-                    >
-                      {deletingId === comment.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
+                    {isEditing ? (
+                      <div className="mt-4">
+                        <textarea
+                          value={editingBody}
+                          onChange={(event) =>
+                            setEditingBody(event.target.value)
+                          }
+                          maxLength={5000}
+                          rows={5}
+                          className="w-full resize-y rounded-lg border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-white outline-none focus:border-cyan-500"
+                        />
 
-                  <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
-                    {comment.body}
-                  </p>
-                </article>
-              ))}
+                        <div className="mt-3 flex items-center justify-between">
+                          <span className="text-xs text-slate-500">
+                            {editingBody.length}
+                            /5000
+                          </span>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={savingEdit}
+                              onClick={handleCancelEdit}
+                              className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800"
+                            >
+                              Cancel
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={
+                                savingEdit || editingBody.trim().length === 0
+                              }
+                              onClick={() => {
+                                void handleSaveEdit(comment);
+                              }}
+                              className="rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-40"
+                            >
+                              {savingEdit ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                        {comment.body}
+                      </p>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
