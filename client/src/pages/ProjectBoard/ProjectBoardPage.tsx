@@ -14,6 +14,8 @@ import {
   type UpdateIssueInput,
 } from "../../api/issues";
 
+import { getWorkspaceById, type WorkspaceMember } from "../../api/workspaces";
+
 import CreateIssueForm from "../../components/kanban/CreateIssueForm";
 import EditIssueForm from "../../components/kanban/EditIssueForm";
 import KanbanBoard from "../../components/kanban/KanbanBoard";
@@ -26,6 +28,8 @@ function ProjectBoardPage() {
   const { accessToken } = useAuth();
 
   const [issues, setIssues] = useState<Issue[]>([]);
+
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -45,29 +49,34 @@ function ProjectBoardPage() {
     }
 
     const currentWorkspaceId = workspaceId;
+
     const currentProjectId = projectId;
+
     const currentAccessToken = accessToken;
 
     let cancelled = false;
 
-    async function loadIssues() {
+    async function loadBoard() {
       try {
         setLoading(true);
         setError(null);
 
-        const data = await getIssues(
-          currentWorkspaceId,
-          currentProjectId,
-          currentAccessToken,
-        );
+        const [issueData, workspaceData] = await Promise.all([
+          getIssues(currentWorkspaceId, currentProjectId, currentAccessToken),
+
+          getWorkspaceById(currentWorkspaceId, currentAccessToken),
+        ]);
 
         if (!cancelled) {
-          setIssues(data);
+          setIssues(issueData);
+          setMembers(workspaceData.members);
         }
       } catch (error) {
         if (!cancelled) {
           setError(
-            error instanceof Error ? error.message : "Unable to load issues",
+            error instanceof Error
+              ? error.message
+              : "Unable to load project board",
           );
         }
       } finally {
@@ -77,7 +86,7 @@ function ProjectBoardPage() {
       }
     }
 
-    void loadIssues();
+    void loadBoard();
 
     return () => {
       cancelled = true;
@@ -284,6 +293,7 @@ function ProjectBoardPage() {
         {showCreateForm && (
           <div className="mb-6">
             <CreateIssueForm
+              members={members}
               onCreate={handleCreateIssue}
               onCancel={() => setShowCreateForm(false)}
             />
@@ -294,6 +304,7 @@ function ProjectBoardPage() {
           <div className="mb-6">
             <EditIssueForm
               issue={editingIssue}
+              members={members}
               onSave={handleUpdateIssue}
               onCancel={() => setEditingIssue(null)}
             />

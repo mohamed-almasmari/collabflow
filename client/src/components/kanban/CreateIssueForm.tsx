@@ -2,17 +2,28 @@ import { useState, type FormEvent } from "react";
 
 import type { CreateIssueInput, IssuePriority } from "../../api/issues";
 
+import type { WorkspaceMember } from "../../api/workspaces";
+
 interface CreateIssueFormProps {
+  members: WorkspaceMember[];
+
   onCreate: (input: CreateIssueInput) => Promise<void>;
 
   onCancel: () => void;
 }
 
-function CreateIssueForm({ onCreate, onCancel }: CreateIssueFormProps) {
+function CreateIssueForm({
+  members,
+  onCreate,
+  onCancel,
+}: CreateIssueFormProps) {
   const [title, setTitle] = useState("");
+
   const [description, setDescription] = useState("");
 
   const [priority, setPriority] = useState<IssuePriority>("MEDIUM");
+
+  const [assigneeId, setAssigneeId] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,6 +34,7 @@ function CreateIssueForm({ onCreate, onCancel }: CreateIssueFormProps) {
 
     if (title.trim().length < 2) {
       setError("Issue title must be at least 2 characters");
+
       return;
     }
 
@@ -32,13 +44,18 @@ function CreateIssueForm({ onCreate, onCancel }: CreateIssueFormProps) {
 
       await onCreate({
         title: title.trim(),
+
         description: description.trim() || undefined,
+
         priority,
+
+        assigneeId: assigneeId || null,
       });
 
       setTitle("");
       setDescription("");
       setPriority("MEDIUM");
+      setAssigneeId("");
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Unable to create issue",
@@ -109,9 +126,36 @@ function CreateIssueForm({ onCreate, onCancel }: CreateIssueFormProps) {
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-cyan-500"
           >
             <option value="LOW">Low</option>
+
             <option value="MEDIUM">Medium</option>
+
             <option value="HIGH">High</option>
+
             <option value="URGENT">Urgent</option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="issue-assignee"
+            className="mb-2 block text-sm font-medium text-slate-300"
+          >
+            Assignee
+          </label>
+
+          <select
+            id="issue-assignee"
+            value={assigneeId}
+            onChange={(event) => setAssigneeId(event.target.value)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-cyan-500"
+          >
+            <option value="">Unassigned</option>
+
+            {members.map((member) => (
+              <option key={member.id} value={member.user.id}>
+                {member.user.name} — {member.role}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -121,7 +165,8 @@ function CreateIssueForm({ onCreate, onCancel }: CreateIssueFormProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            disabled={submitting}
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
           >
             Cancel
           </button>

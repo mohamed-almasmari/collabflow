@@ -7,15 +7,24 @@ import type {
   UpdateIssueInput,
 } from "../../api/issues";
 
+import type { WorkspaceMember } from "../../api/workspaces";
+
 interface EditIssueFormProps {
   issue: Issue;
+
+  members: WorkspaceMember[];
 
   onSave: (issueId: string, input: UpdateIssueInput) => Promise<void>;
 
   onCancel: () => void;
 }
 
-function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
+function EditIssueForm({
+  issue,
+  members,
+  onSave,
+  onCancel,
+}: EditIssueFormProps) {
   const [title, setTitle] = useState(issue.title);
 
   const [description, setDescription] = useState(issue.description ?? "");
@@ -23,6 +32,8 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
   const [priority, setPriority] = useState<IssuePriority>(issue.priority);
 
   const [status, setStatus] = useState<IssueStatus>(issue.status);
+
+  const [assigneeId, setAssigneeId] = useState(issue.assigneeId ?? "");
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,6 +44,7 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
 
     if (title.trim().length < 2) {
       setError("Issue title must be at least 2 characters");
+
       return;
     }
 
@@ -42,9 +54,14 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
 
       await onSave(issue.id, {
         title: title.trim(),
+
         description: description.trim() || null,
+
         priority,
+
         status,
+
+        assigneeId: assigneeId || null,
       });
     } catch (error) {
       setError(
@@ -73,6 +90,7 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
 
           <input
             id="edit-issue-title"
+            type="text"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-cyan-500"
@@ -110,11 +128,14 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
             onChange={(event) =>
               setPriority(event.target.value as IssuePriority)
             }
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-cyan-500"
           >
             <option value="LOW">Low</option>
+
             <option value="MEDIUM">Medium</option>
+
             <option value="HIGH">High</option>
+
             <option value="URGENT">Urgent</option>
           </select>
         </div>
@@ -131,11 +152,37 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
             id="edit-issue-status"
             value={status}
             onChange={(event) => setStatus(event.target.value as IssueStatus)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-cyan-500"
           >
             <option value="TODO">To Do</option>
+
             <option value="IN_PROGRESS">In Progress</option>
+
             <option value="DONE">Done</option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="edit-issue-assignee"
+            className="mb-2 block text-sm font-medium text-slate-300"
+          >
+            Assignee
+          </label>
+
+          <select
+            id="edit-issue-assignee"
+            value={assigneeId}
+            onChange={(event) => setAssigneeId(event.target.value)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-cyan-500"
+          >
+            <option value="">Unassigned</option>
+
+            {members.map((member) => (
+              <option key={member.id} value={member.user.id}>
+                {member.user.name} — {member.role}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -145,7 +192,8 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300"
+            disabled={submitting}
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -153,7 +201,7 @@ function EditIssueForm({ issue, onSave, onCancel }: EditIssueFormProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+            className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-50"
           >
             {submitting ? "Saving..." : "Save Changes"}
           </button>
