@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useParams, useSearchParams } from "react-router";
 
@@ -27,6 +27,7 @@ import {
 
 import ActivityTimeline from "../../components/Activity/ActivityTimeline";
 import CommentsPanel from "../../components/Comments/CommentsPanel";
+import BoardFilters from "../../components/Kanban/BoardFilters";
 import CreateIssueForm from "../../components/Kanban/CreateIssueForm";
 import EditIssueForm from "../../components/Kanban/EditIssueForm";
 import KanbanBoard from "../../components/Kanban/KanbanBoard";
@@ -48,10 +49,16 @@ import {
   updateRealtimeIssue,
 } from "../../utils/issueRealtime";
 
+type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
+
+type PriorityFilter = "ALL" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
 
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const linkedIssueId = searchParams.get("issue");
 
   const { accessToken, user } = useAuth();
 
@@ -86,6 +93,40 @@ function ProjectBoardPage() {
   const [deletingIssue, setDeletingIssue] = useState<Issue | null>(null);
 
   const [deleting, setDeleting] = useState(false);
+
+  const [searchText, setSearchText] = useState("");
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
+
+  const [assigneeFilter, setAssigneeFilter] = useState("ALL");
+
+  const filteredIssues = useMemo(() => {
+    const normalizedSearch = searchText.trim().toLowerCase();
+
+    return issues.filter((issue) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        issue.title.toLowerCase().includes(normalizedSearch) ||
+        (issue.description ?? "").toLowerCase().includes(normalizedSearch);
+
+      const matchesStatus =
+        statusFilter === "ALL" || issue.status === statusFilter;
+
+      const matchesPriority =
+        priorityFilter === "ALL" || issue.priority === priorityFilter;
+
+      const matchesAssignee =
+        assigneeFilter === "ALL" ||
+        (assigneeFilter === "UNASSIGNED" && !issue.assigneeId) ||
+        issue.assigneeId === assigneeFilter;
+
+      return (
+        matchesSearch && matchesStatus && matchesPriority && matchesAssignee
+      );
+    });
+  }, [issues, searchText, statusFilter, priorityFilter, assigneeFilter]);
 
   const loadActivity = useCallback(async () => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -161,16 +202,12 @@ function ProjectBoardPage() {
 
         setActivities(activityData);
 
-        const issueIdFromUrl = searchParams.get("issue");
-
-        if (issueIdFromUrl) {
+        if (linkedIssueId) {
           const linkedIssue = issueData.find(
-            (issue) => issue.id === issueIdFromUrl,
+            (issue) => issue.id === linkedIssueId,
           );
 
-          if (linkedIssue) {
-            setDiscussionIssue(linkedIssue);
-          }
+          setDiscussionIssue(linkedIssue ?? null);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -192,7 +229,7 @@ function ProjectBoardPage() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, projectId, accessToken, searchParams]);
+  }, [workspaceId, projectId, accessToken, linkedIssueId]);
 
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
@@ -478,9 +515,7 @@ function ProjectBoardPage() {
 
   function emitIssueActivity(
     issueId: string,
-
     activity: IssueActivityType,
-
     active: boolean,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -663,6 +698,8 @@ function ProjectBoardPage() {
 
       if (discussionIssue?.id === issueId) {
         setDiscussionIssue(null);
+
+        setSearchParams({});
       }
 
       if (editingIssue?.id === issueId) {
@@ -755,8 +792,22 @@ function ProjectBoardPage() {
     setSearchParams({});
   }
 
-  function handleDragActivity(issueId: string, active: boolean) {
+  function handleDragActivity(
+    issueId: string,
+
+    active: boolean,
+  ) {
     emitIssueActivity(issueId, "DRAGGING", active);
+  }
+
+  function handleClearFilters() {
+    setSearchText("");
+
+    setStatusFilter("ALL");
+
+    setPriorityFilter("ALL");
+
+    setAssigneeFilter("ALL");
   }
 
   const currentMembership = user
@@ -935,9 +986,24 @@ function ProjectBoardPage() {
           />
         )}
 
+        <BoardFilters
+          searchText={searchText}
+          statusFilter={statusFilter}
+          priorityFilter={priorityFilter}
+          assigneeFilter={assigneeFilter}
+          members={members}
+          filteredCount={filteredIssues.length}
+          totalCount={issues.length}
+          onSearchChange={setSearchText}
+          onStatusChange={setStatusFilter}
+          onPriorityChange={setPriorityFilter}
+          onAssigneeChange={setAssigneeFilter}
+          onClear={handleClearFilters}
+        />
+
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <KanbanBoard
-            issues={issues}
+            issues={filteredIssues}
             activities={issueActivities}
             onMoveIssue={handleMoveIssue}
             onCommentsIssue={handleOpenComments}
