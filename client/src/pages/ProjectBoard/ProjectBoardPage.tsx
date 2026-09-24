@@ -27,6 +27,7 @@ import {
 
 import ActivityTimeline from "../../components/Activity/ActivityTimeline";
 import CommentsPanel from "../../components/Comments/CommentsPanel";
+import BoardActions from "../../components/Kanban/BoardActions";
 import BoardFilters from "../../components/Kanban/BoardFilters";
 import BoardStats from "../../components/Kanban/BoardStats";
 import CreateIssueForm from "../../components/Kanban/CreateIssueForm";
@@ -458,7 +459,6 @@ function ProjectBoardPage() {
 
         return [
           ...currentActivities,
-
           {
             issueId: payload.issueId,
 
@@ -636,7 +636,13 @@ function ProjectBoardPage() {
     setSearchParams,
   ]);
 
-  function setQueryParameter(key: string, value: string, defaultValue: string) {
+  function setQueryParameter(
+    key: string,
+
+    value: string,
+
+    defaultValue: string,
+  ) {
     setSearchParams((currentParams) => {
       const nextParams = new URLSearchParams(currentParams);
 
@@ -1234,6 +1240,11 @@ function ProjectBoardPage() {
           onSortChange={handleSortChange}
           onMyIssuesChange={handleMyIssuesChange}
           onClear={handleClearFilters}
+        />
+
+        <BoardActions
+          issues={filteredIssues}
+          projectName={project?.name ?? "CollabFlow Project"}
         />
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
