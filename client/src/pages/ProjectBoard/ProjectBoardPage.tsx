@@ -47,6 +47,8 @@ function ProjectBoardPage() {
 
   const [error, setError] = useState<string | null>(null);
 
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
@@ -120,6 +122,8 @@ function ProjectBoardPage() {
 
   useEffect(() => {
     if (!workspaceId || !projectId || !accessToken) {
+      setRealtimeConnected(false);
+
       return;
     }
 
@@ -129,7 +133,7 @@ function ProjectBoardPage() {
 
     const currentAccessToken = accessToken;
 
-    const socket = getSocket();
+    const socket = getSocket(currentAccessToken);
 
     const roomPayload = {
       workspaceId: currentWorkspaceId,
@@ -137,7 +141,25 @@ function ProjectBoardPage() {
       projectId: currentProjectId,
     };
 
-    socket.emit("project:join", roomPayload);
+    function joinProjectRoom() {
+      setRealtimeConnected(true);
+
+      socket.emit("project:join", roomPayload);
+    }
+
+    function handleDisconnect() {
+      setRealtimeConnected(false);
+    }
+
+    function handleConnectError(error: Error) {
+      setRealtimeConnected(false);
+
+      setError(error.message || "Unable to connect to real-time server");
+    }
+
+    function handleSocketError(payload: { message: string }) {
+      setError(payload.message);
+    }
 
     async function handleBoardRefresh(payload: {
       workspaceId: string;
@@ -165,21 +187,47 @@ function ProjectBoardPage() {
       }
     }
 
+    socket.on("connect", joinProjectRoom);
+
+    socket.on("disconnect", handleDisconnect);
+
+    socket.on("connect_error", handleConnectError);
+
+    socket.on("socket:error", handleSocketError);
+
     socket.on("board:refresh", handleBoardRefresh);
 
-    return () => {
-      socket.off("board:refresh", handleBoardRefresh);
+    if (socket.connected) {
+      joinProjectRoom();
+    }
 
-      socket.emit("project:leave", roomPayload);
+    return () => {
+      if (socket.connected) {
+        socket.emit("project:leave", roomPayload);
+      }
+
+      socket.off("connect", joinProjectRoom);
+
+      socket.off("disconnect", handleDisconnect);
+
+      socket.off("connect_error", handleConnectError);
+
+      socket.off("socket:error", handleSocketError);
+
+      socket.off("board:refresh", handleBoardRefresh);
     };
   }, [workspaceId, projectId, accessToken]);
 
   function broadcastBoardChange() {
-    if (!workspaceId || !projectId) {
+    if (!workspaceId || !projectId || !accessToken) {
       return;
     }
 
-    const socket = getSocket();
+    const socket = getSocket(accessToken);
+
+    if (!socket.connected) {
+      return;
+    }
 
     socket.emit("board:changed", {
       workspaceId,
@@ -402,7 +450,15 @@ function ProjectBoardPage() {
                   {issues.length} {issues.length === 1 ? "issue" : "issues"}
                 </span>
 
-                <span className="text-emerald-400">Real-time connected</span>
+                <span
+                  className={
+                    realtimeConnected ? "text-emerald-400" : "text-amber-400"
+                  }
+                >
+                  {realtimeConnected
+                    ? "Real-time connected"
+                    : "Real-time disconnected"}
+                </span>
               </div>
             </div>
 
