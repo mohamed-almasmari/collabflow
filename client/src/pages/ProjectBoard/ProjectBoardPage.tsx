@@ -28,6 +28,7 @@ import {
 import ActivityTimeline from "../../components/Activity/ActivityTimeline";
 import CommentsPanel from "../../components/Comments/CommentsPanel";
 import BoardFilters from "../../components/Kanban/BoardFilters";
+import BoardStats from "../../components/Kanban/BoardStats";
 import CreateIssueForm from "../../components/Kanban/CreateIssueForm";
 import EditIssueForm from "../../components/Kanban/EditIssueForm";
 import KanbanBoard from "../../components/Kanban/KanbanBoard";
@@ -515,7 +516,9 @@ function ProjectBoardPage() {
 
   function emitIssueActivity(
     issueId: string,
+
     activity: IssueActivityType,
+
     active: boolean,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -911,6 +914,8 @@ function ProjectBoardPage() {
             {error}
           </div>
         )}
+
+        <BoardStats issues={issues} />
 
         {showCreateForm && (
           <div className="mb-6">
