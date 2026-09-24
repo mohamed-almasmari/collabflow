@@ -26,6 +26,7 @@ import {
 } from "../../api/workspaces";
 
 import ActivityTimeline from "../../components/activity/ActivityTimeline";
+import CommentsPanel from "../../components/comments/CommentsPanel";
 import CreateIssueForm from "../../components/kanban/CreateIssueForm";
 import EditIssueForm from "../../components/kanban/EditIssueForm";
 import KanbanBoard from "../../components/kanban/KanbanBoard";
@@ -67,6 +68,8 @@ function ProjectBoardPage() {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
 
   const [issueActivities, setIssueActivities] = useState<IssueActivity[]>([]);
+
+  const [discussionIssue, setDiscussionIssue] = useState<Issue | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -324,6 +327,10 @@ function ProjectBoardPage() {
         updateRealtimeIssue(currentIssues, payload.issue),
       );
 
+      setDiscussionIssue((currentIssue) =>
+        currentIssue?.id === payload.issue.id ? payload.issue : currentIssue,
+      );
+
       refreshActivitySoon();
     }
 
@@ -338,6 +345,10 @@ function ProjectBoardPage() {
 
       setIssues((currentIssues) =>
         moveRealtimeIssue(currentIssues, payload.issue),
+      );
+
+      setDiscussionIssue((currentIssue) =>
+        currentIssue?.id === payload.issue.id ? payload.issue : currentIssue,
       );
 
       refreshActivitySoon();
@@ -362,10 +373,12 @@ function ProjectBoardPage() {
         ),
       );
 
-      setEditingIssue((currentEditingIssue) =>
-        currentEditingIssue?.id === payload.issueId
-          ? null
-          : currentEditingIssue,
+      setEditingIssue((currentIssue) =>
+        currentIssue?.id === payload.issueId ? null : currentIssue,
+      );
+
+      setDiscussionIssue((currentIssue) =>
+        currentIssue?.id === payload.issueId ? null : currentIssue,
       );
 
       refreshActivitySoon();
@@ -521,6 +534,10 @@ function ProjectBoardPage() {
         updateRealtimeIssue(currentIssues, updatedIssue),
       );
 
+      setDiscussionIssue((currentIssue) =>
+        currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
+      );
+
       setEditingIssue(null);
 
       emitIssueEvent("issue:updated", updatedIssue.id);
@@ -590,6 +607,10 @@ function ProjectBoardPage() {
         moveRealtimeIssue(currentIssues, movedIssue),
       );
 
+      setDiscussionIssue((currentIssue) =>
+        currentIssue?.id === movedIssue.id ? movedIssue : currentIssue,
+      );
+
       emitIssueEvent("issue:moved", movedIssue.id);
 
       refreshActivitySoon();
@@ -611,6 +632,7 @@ function ProjectBoardPage() {
 
     try {
       setDeleting(true);
+
       setError(null);
 
       await deleteIssue(workspaceId, projectId, issueId, accessToken);
@@ -620,6 +642,10 @@ function ProjectBoardPage() {
       setIssueActivities((currentActivities) =>
         currentActivities.filter((activity) => activity.issueId !== issueId),
       );
+
+      if (discussionIssue?.id === issueId) {
+        setDiscussionIssue(null);
+      }
 
       if (editingIssue?.id === issueId) {
         emitIssueActivity(issueId, "EDITING", false);
@@ -649,8 +675,11 @@ function ProjectBoardPage() {
     }
 
     setEditingIssue(null);
+
     setDeletingIssue(null);
+
     setShowCreateForm(true);
+
     setError(null);
   }
 
@@ -660,8 +689,11 @@ function ProjectBoardPage() {
     }
 
     setShowCreateForm(false);
+
     setDeletingIssue(null);
+
     setEditingIssue(issue);
+
     setError(null);
 
     emitIssueActivity(issue.id, "EDITING", true);
@@ -681,8 +713,17 @@ function ProjectBoardPage() {
     }
 
     setShowCreateForm(false);
+
     setEditingIssue(null);
+
     setDeletingIssue(issue);
+
+    setError(null);
+  }
+
+  function handleOpenComments(issue: Issue) {
+    setDiscussionIssue(issue);
+
     setError(null);
   }
 
@@ -850,11 +891,22 @@ function ProjectBoardPage() {
           </div>
         )}
 
+        {discussionIssue && workspaceId && projectId && accessToken && (
+          <CommentsPanel
+            workspaceId={workspaceId}
+            projectId={projectId}
+            issue={discussionIssue}
+            accessToken={accessToken}
+            onClose={() => setDiscussionIssue(null)}
+          />
+        )}
+
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <KanbanBoard
             issues={issues}
             activities={issueActivities}
             onMoveIssue={handleMoveIssue}
+            onCommentsIssue={handleOpenComments}
             onEditIssue={handleStartEdit}
             onDeleteIssue={handleStartDelete}
             onDragActivity={handleDragActivity}

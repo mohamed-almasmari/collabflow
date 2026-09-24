@@ -23,6 +23,8 @@ interface KanbanColumnProps {
   onEditIssue: (issue: Issue) => void;
 
   onDeleteIssue: (issue: Issue) => void;
+
+  onCommentsIssue: (issue: Issue) => void;
 }
 
 function KanbanColumn({
@@ -32,6 +34,7 @@ function KanbanColumn({
   activities,
   onEditIssue,
   onDeleteIssue,
+  onCommentsIssue,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -81,6 +84,7 @@ function KanbanColumn({
                 activities={activities.filter(
                   (activity) => activity.issueId === issue.id,
                 )}
+                onComments={onCommentsIssue}
                 onEdit={onEditIssue}
                 onDelete={onDeleteIssue}
               />

@@ -29,6 +29,8 @@ interface KanbanBoardProps {
 
   onDeleteIssue: (issue: Issue) => void;
 
+  onCommentsIssue: (issue: Issue) => void;
+
   onDragActivity: (issueId: string, active: boolean) => void;
 }
 
@@ -40,6 +42,7 @@ function KanbanBoard({
   onMoveIssue,
   onEditIssue,
   onDeleteIssue,
+  onCommentsIssue,
   onDragActivity,
 }: KanbanBoardProps) {
   const sensors = useSensors(
@@ -134,6 +137,7 @@ function KanbanBoard({
           status="TODO"
           issues={issues}
           activities={activities}
+          onCommentsIssue={onCommentsIssue}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
         />
@@ -143,6 +147,7 @@ function KanbanBoard({
           status="IN_PROGRESS"
           issues={issues}
           activities={activities}
+          onCommentsIssue={onCommentsIssue}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
         />
@@ -152,6 +157,7 @@ function KanbanBoard({
           status="DONE"
           issues={issues}
           activities={activities}
+          onCommentsIssue={onCommentsIssue}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
         />

@@ -14,6 +14,8 @@ interface IssueCardProps {
   onEdit: (issue: Issue) => void;
 
   onDelete: (issue: Issue) => void;
+
+  onComments: (issue: Issue) => void;
 }
 
 const priorityStyles: Record<IssuePriority, string> = {
@@ -36,7 +38,13 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
-function IssueCard({ issue, activities, onEdit, onDelete }: IssueCardProps) {
+function IssueCard({
+  issue,
+  activities,
+  onEdit,
+  onDelete,
+  onComments,
+}: IssueCardProps) {
   const {
     attributes,
     listeners,
@@ -128,7 +136,22 @@ function IssueCard({ issue, activities, onEdit, onDelete }: IssueCardProps) {
       </div>
 
       <div className="border-t border-slate-700 pt-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+
+              onComments(issue);
+            }}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            className="text-xs font-medium text-violet-400 transition hover:text-violet-300"
+          >
+            Comments
+          </button>
+
           <button
             type="button"
             onClick={(event) => {
