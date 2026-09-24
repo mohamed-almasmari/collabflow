@@ -2,9 +2,22 @@ import { useEffect, useState } from "react";
 
 import { useNavigate } from "react-router";
 
-import { getProjects, type Project } from "../../api/projects";
+import {
+  createProject,
+  getProjects,
+  type CreateProjectInput,
+  type Project,
+} from "../../api/projects";
 
-import { getWorkspaces, type WorkspaceSummary } from "../../api/workspaces";
+import {
+  createWorkspace,
+  getWorkspaces,
+  type CreateWorkspaceInput,
+  type WorkspaceSummary,
+} from "../../api/workspaces";
+
+import CreateProjectForm from "../../pages/Dashboard/CreateProjectForm.tsx";
+import CreateWorkspaceForm from "../../pages/Dashboard/CreateWorkspaceForm";
 
 import { useAuth } from "../../hooks/useAuth";
 
@@ -24,7 +37,36 @@ function DashboardPage() {
 
   const [loadingProjects, setLoadingProjects] = useState(false);
 
+  const [showWorkspaceForm, setShowWorkspaceForm] = useState(false);
+
+  const [showProjectForm, setShowProjectForm] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+
+  async function loadWorkspaces(token: string) {
+    const data = await getWorkspaces(token);
+
+    setWorkspaces(data);
+
+    setSelectedWorkspace((currentWorkspace) => {
+      if (
+        currentWorkspace &&
+        data.some((workspace) => workspace.id === currentWorkspace.id)
+      ) {
+        return (
+          data.find((workspace) => workspace.id === currentWorkspace.id) ?? null
+        );
+      }
+
+      return data[0] ?? null;
+    });
+  }
+
+  async function loadProjects(workspaceId: string, token: string) {
+    const data = await getProjects(workspaceId, token);
+
+    setProjects(data);
+  }
 
   useEffect(() => {
     if (!accessToken) {
@@ -35,7 +77,7 @@ function DashboardPage() {
 
     let cancelled = false;
 
-    async function loadWorkspaces() {
+    async function loadDashboard() {
       try {
         setLoadingWorkspaces(true);
         setError(null);
@@ -48,9 +90,7 @@ function DashboardPage() {
 
         setWorkspaces(data);
 
-        if (data.length > 0) {
-          setSelectedWorkspace(data[0] ?? null);
-        }
+        setSelectedWorkspace(data[0] ?? null);
       } catch (error) {
         if (!cancelled) {
           setError(
@@ -66,7 +106,7 @@ function DashboardPage() {
       }
     }
 
-    void loadWorkspaces();
+    void loadDashboard();
 
     return () => {
       cancelled = true;
@@ -85,7 +125,7 @@ function DashboardPage() {
 
     let cancelled = false;
 
-    async function loadProjects() {
+    async function loadWorkspaceProjects() {
       try {
         setLoadingProjects(true);
         setError(null);
@@ -108,15 +148,42 @@ function DashboardPage() {
       }
     }
 
-    void loadProjects();
+    void loadWorkspaceProjects();
 
     return () => {
       cancelled = true;
     };
   }, [selectedWorkspace, accessToken]);
 
+  async function handleCreateWorkspace(input: CreateWorkspaceInput) {
+    if (!accessToken) {
+      throw new Error("Authentication required");
+    }
+
+    await createWorkspace(input, accessToken);
+
+    await loadWorkspaces(accessToken);
+
+    setShowWorkspaceForm(false);
+  }
+
+  async function handleCreateProject(input: CreateProjectInput) {
+    if (!accessToken || !selectedWorkspace) {
+      throw new Error("Workspace is required");
+    }
+
+    await createProject(selectedWorkspace.id, input, accessToken);
+
+    await loadProjects(selectedWorkspace.id, accessToken);
+
+    setShowProjectForm(false);
+  }
+
   function handleSelectWorkspace(workspace: WorkspaceSummary) {
     setSelectedWorkspace(workspace);
+
+    setShowProjectForm(false);
+    setError(null);
   }
 
   function handleOpenProject(project: Project) {
@@ -127,6 +194,18 @@ function DashboardPage() {
     navigate(
       `/workspaces/${selectedWorkspace.id}/projects/${project.id}/board`,
     );
+  }
+
+  function handleStartWorkspaceCreation() {
+    setShowProjectForm(false);
+    setShowWorkspaceForm(true);
+    setError(null);
+  }
+
+  function handleStartProjectCreation() {
+    setShowWorkspaceForm(false);
+    setShowProjectForm(true);
+    setError(null);
   }
 
   if (loadingWorkspaces) {
@@ -140,21 +219,49 @@ function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-8">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
-            CollabFlow
-          </p>
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
+              CollabFlow
+            </p>
 
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
 
-          <p className="mt-2 text-slate-400">
-            Select a workspace and open one of its projects.
-          </p>
+            <p className="mt-2 text-slate-400">
+              Manage your workspaces and projects.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleStartWorkspaceCreation}
+            className="self-start rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 sm:self-auto"
+          >
+            New Workspace
+          </button>
         </header>
 
         {error && (
           <div className="mb-6 rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300">
             {error}
+          </div>
+        )}
+
+        {showWorkspaceForm && (
+          <div className="mb-6">
+            <CreateWorkspaceForm
+              onCreate={handleCreateWorkspace}
+              onCancel={() => setShowWorkspaceForm(false)}
+            />
+          </div>
+        )}
+
+        {showProjectForm && selectedWorkspace && (
+          <div className="mb-6">
+            <CreateProjectForm
+              onCreate={handleCreateProject}
+              onCancel={() => setShowProjectForm(false)}
+            />
           </div>
         )}
 
@@ -191,21 +298,13 @@ function DashboardPage() {
                           }
                         `}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-white">
-                            {workspace.name}
-                          </p>
+                      <p className="truncate font-medium text-white">
+                        {workspace.name}
+                      </p>
 
-                          <p className="mt-1 text-xs text-slate-500">
-                            {workspace.role}
-                          </p>
-                        </div>
-
-                        {active && (
-                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
-                        )}
-                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {workspace.role}
+                      </p>
                     </button>
                   );
                 })}
@@ -216,17 +315,30 @@ function DashboardPage() {
           <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
             {selectedWorkspace ? (
               <>
-                <header className="mb-6">
-                  <p className="text-sm font-medium text-cyan-400">Workspace</p>
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-cyan-400">
+                      Workspace
+                    </p>
 
-                  <h2 className="mt-1 text-2xl font-bold">
-                    {selectedWorkspace.name}
-                  </h2>
+                    <h2 className="mt-1 text-2xl font-bold">
+                      {selectedWorkspace.name}
+                    </h2>
 
-                  <p className="mt-2 text-sm text-slate-400">
-                    {selectedWorkspace.description ??
-                      "No workspace description."}
-                  </p>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-400">
+                      {selectedWorkspace.description ??
+                        "No workspace description."}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleStartProjectCreation}
+                    disabled={selectedWorkspace.role === "MEMBER"}
+                    className="rounded-lg border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-600"
+                  >
+                    New Project
+                  </button>
                 </header>
 
                 <div className="mb-4 flex items-center justify-between">
@@ -247,7 +359,7 @@ function DashboardPage() {
                     </p>
 
                     <p className="mt-2 text-sm text-slate-500">
-                      This workspace does not have any projects.
+                      Create the first project in this workspace.
                     </p>
                   </div>
                 ) : (
@@ -280,15 +392,13 @@ function DashboardPage() {
                           {project.description ?? "No project description."}
                         </p>
 
-                        <div className="mt-5">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenProject(project)}
-                            className="w-full rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
-                          >
-                            Open Board
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenProject(project)}
+                          className="mt-5 w-full rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+                        >
+                          Open Board
+                        </button>
                       </article>
                     ))}
                   </div>
@@ -298,11 +408,11 @@ function DashboardPage() {
               <div className="flex min-h-72 items-center justify-center">
                 <div className="text-center">
                   <p className="font-medium text-slate-300">
-                    Select a workspace
+                    No workspace selected
                   </p>
 
                   <p className="mt-2 text-sm text-slate-500">
-                    Choose a workspace to view its projects.
+                    Create or select a workspace to continue.
                   </p>
                 </div>
               </div>

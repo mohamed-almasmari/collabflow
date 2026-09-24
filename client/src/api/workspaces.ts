@@ -44,12 +44,30 @@ export interface Workspace {
   members: WorkspaceMember[];
 }
 
+export interface CreateWorkspaceInput {
+  name: string;
+  description?: string;
+}
+
 interface GetWorkspacesResponse {
   workspaces: WorkspaceSummary[];
 }
 
 interface GetWorkspaceResponse {
   workspace: Workspace;
+}
+
+interface CreateWorkspaceResponse {
+  message: string;
+
+  workspace: {
+    id: string;
+    name: string;
+    description: string | null;
+    ownerId: string;
+    createdAt: string;
+    updatedAt: string;
+  };
 }
 
 export async function getWorkspaces(
@@ -95,4 +113,31 @@ export async function getWorkspaceById(
   const data: GetWorkspaceResponse = await response.json();
 
   return data.workspace;
+}
+
+export async function createWorkspace(
+  input: CreateWorkspaceInput,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/workspaces`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    throw new Error(data?.message ?? "Unable to create workspace");
+  }
+
+  const data: CreateWorkspaceResponse = await response.json();
+
+  if (!data.workspace) {
+    throw new Error("Invalid workspace response");
+  }
 }
