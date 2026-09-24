@@ -149,7 +149,6 @@ export async function createIssue(req: AuthenticatedRequest, res: Response) {
     });
   }
 }
-
 export async function getIssues(req: AuthenticatedRequest, res: Response) {
   if (!req.userId) {
     return res.status(401).json({
@@ -239,7 +238,6 @@ export async function getIssues(req: AuthenticatedRequest, res: Response) {
     });
   }
 }
-
 export async function getIssueById(req: AuthenticatedRequest, res: Response) {
   if (!req.userId) {
     return res.status(401).json({
@@ -334,7 +332,6 @@ export async function getIssueById(req: AuthenticatedRequest, res: Response) {
     });
   }
 }
-
 export async function updateIssue(req: AuthenticatedRequest, res: Response) {
   if (!req.userId) {
     return res.status(401).json({
@@ -631,6 +628,121 @@ export async function moveIssue(req: AuthenticatedRequest, res: Response) {
 
     return res.status(500).json({
       message: "Unable to move issue",
+    });
+  }
+}
+export async function deleteIssue(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  if (!req.userId) {
+    return res.status(401).json({
+      message: "Authentication required",
+    });
+  }
+
+  const workspaceId = req.params.workspaceId;
+  const projectId = req.params.projectId;
+  const issueId = req.params.issueId;
+
+  if (
+    typeof workspaceId !== "string" ||
+    typeof projectId !== "string" ||
+    typeof issueId !== "string"
+  ) {
+    return res.status(400).json({
+      message: "Workspace ID, project ID, and issue ID are required",
+    });
+  }
+
+  try {
+    const membership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: req.userId,
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(403).json({
+        message: "You do not have access to this workspace",
+      });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        workspaceId,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    if (project.status === "ARCHIVED") {
+      return res.status(400).json({
+        message: "Cannot delete issues from an archived project",
+      });
+    }
+
+    const issue = await prisma.issue.findFirst({
+      where: {
+        id: issueId,
+        projectId,
+      },
+      select: {
+        id: true,
+        status: true,
+        position: true,
+      },
+    });
+
+    if (!issue) {
+      return res.status(404).json({
+        message: "Issue not found",
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.issue.delete({
+        where: {
+          id: issueId,
+        },
+      });
+
+      await tx.issue.updateMany({
+        where: {
+          projectId,
+          status: issue.status,
+          position: {
+            gt: issue.position,
+          },
+        },
+        data: {
+          position: {
+            decrement: 1,
+          },
+        },
+      });
+    });
+
+    return res.status(200).json({
+      message: "Issue deleted successfully",
+    });
+  } catch (error) {
+    console.error("Issue deletion failed:", error);
+
+    return res.status(500).json({
+      message: "Unable to delete issue",
     });
   }
 }
