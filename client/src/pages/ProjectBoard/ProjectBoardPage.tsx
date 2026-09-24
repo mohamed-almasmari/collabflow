@@ -6,6 +6,7 @@ import {
   createIssue,
   deleteIssue,
   getIssues,
+  IssueConflictError,
   moveIssue,
   updateIssue,
   type CreateIssueInput,
@@ -184,14 +185,14 @@ function ProjectBoardPage() {
       setIssueActivities([]);
     }
 
-    function handleConnectError(error: Error) {
+    function handleConnectError(socketError: Error) {
       setRealtimeConnected(false);
 
       setPresenceUsers([]);
 
       setIssueActivities([]);
 
-      setError(error.message || "Unable to connect to real-time server");
+      setError(socketError.message || "Unable to connect to real-time server");
     }
 
     function handleSocketError(payload: { message: string }) {
@@ -238,6 +239,7 @@ function ProjectBoardPage() {
 
         return [
           ...currentActivities,
+
           {
             issueId: payload.issueId,
 
@@ -275,6 +277,16 @@ function ProjectBoardPage() {
       setIssues((currentIssues) =>
         updateRealtimeIssue(currentIssues, payload.issue),
       );
+
+      /*
+       * Important:
+       * Do NOT replace editingIssue here.
+       *
+       * If this browser is editing the
+       * same issue, its original updatedAt
+       * must remain intact so the server
+       * can detect a stale save.
+       */
     }
 
     function handleIssueMoved(payload: {
@@ -308,6 +320,12 @@ function ProjectBoardPage() {
         currentActivities.filter(
           (activity) => activity.issueId !== payload.issueId,
         ),
+      );
+
+      setEditingIssue((currentEditingIssue) =>
+        currentEditingIssue?.id === payload.issueId
+          ? null
+          : currentEditingIssue,
       );
     }
 
@@ -436,12 +454,17 @@ function ProjectBoardPage() {
       throw new Error("Unable to update issue");
     }
 
+    if (!editingIssue || editingIssue.id !== issueId) {
+      throw new Error("The issue being edited is no longer available");
+    }
+
     try {
       const updatedIssue = await updateIssue(
         workspaceId,
         projectId,
         issueId,
         input,
+        editingIssue.updatedAt,
         accessToken,
       );
 
@@ -452,6 +475,20 @@ function ProjectBoardPage() {
       setEditingIssue(null);
 
       emitIssueEvent("issue:updated", updatedIssue.id);
+    } catch (error) {
+      if (error instanceof IssueConflictError) {
+        const latestIssue = issues.find((issue) => issue.id === issueId);
+
+        if (latestIssue) {
+          setEditingIssue(latestIssue);
+        }
+
+        throw new IssueConflictError(
+          "Another collaborator changed this issue while you were editing it. The form has been refreshed with the latest issue. Review the changes and save again.",
+        );
+      }
+
+      throw error;
     } finally {
       emitIssueActivity(issueId, "EDITING", false);
     }
@@ -565,7 +602,9 @@ function ProjectBoardPage() {
 
     setShowCreateForm(false);
     setDeletingIssue(null);
+
     setEditingIssue(issue);
+
     setError(null);
 
     emitIssueActivity(issue.id, "EDITING", true);
@@ -705,6 +744,7 @@ function ProjectBoardPage() {
         {editingIssue && (
           <div className="mb-6">
             <EditIssueForm
+              key={`${editingIssue.id}-${editingIssue.updatedAt}`}
               issue={editingIssue}
               members={members}
               onSave={handleUpdateIssue}
