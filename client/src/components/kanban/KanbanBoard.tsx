@@ -5,14 +5,19 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 
 import type { Issue, IssueStatus } from "../../api/issues";
+
+import type { IssueActivity } from "../../socket/socket";
 
 import KanbanColumn from "./KanbanColumn";
 
 interface KanbanBoardProps {
   issues: Issue[];
+
+  activities: IssueActivity[];
 
   onMoveIssue: (
     issueId: string,
@@ -23,15 +28,19 @@ interface KanbanBoardProps {
   onEditIssue: (issue: Issue) => void;
 
   onDeleteIssue: (issue: Issue) => void;
+
+  onDragActivity: (issueId: string, active: boolean) => void;
 }
 
 const statuses: IssueStatus[] = ["TODO", "IN_PROGRESS", "DONE"];
 
 function KanbanBoard({
   issues,
+  activities,
   onMoveIssue,
   onEditIssue,
   onDeleteIssue,
+  onDragActivity,
 }: KanbanBoardProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -41,63 +50,80 @@ function KanbanBoard({
     }),
   );
 
+  function handleDragStart(event: DragStartEvent) {
+    const issueId = String(event.active.id);
+
+    onDragActivity(issueId, true);
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (!over) {
-      return;
-    }
-
     const issueId = String(active.id);
 
-    const issue = issues.find((item) => item.id === issueId);
-
-    if (!issue) {
-      return;
-    }
-
-    let targetStatus: IssueStatus;
-    let targetPosition: number;
-
-    const overId = String(over.id);
-
-    if (statuses.includes(overId as IssueStatus)) {
-      targetStatus = overId as IssueStatus;
-
-      const targetIssues = issues
-        .filter((item) => item.status === targetStatus && item.id !== issueId)
-        .sort((a, b) => a.position - b.position);
-
-      targetPosition = targetIssues.length;
-    } else {
-      const overIssue = issues.find((item) => item.id === overId);
-
-      if (!overIssue) {
+    try {
+      if (!over) {
         return;
       }
 
-      targetStatus = overIssue.status;
+      const issue = issues.find((item) => item.id === issueId);
 
-      const targetIssues = issues
-        .filter((item) => item.status === targetStatus && item.id !== issueId)
-        .sort((a, b) => a.position - b.position);
+      if (!issue) {
+        return;
+      }
 
-      const index = targetIssues.findIndex((item) => item.id === overIssue.id);
+      let targetStatus: IssueStatus;
 
-      targetPosition = index >= 0 ? index : targetIssues.length;
+      let targetPosition: number;
+
+      const overId = String(over.id);
+
+      if (statuses.includes(overId as IssueStatus)) {
+        targetStatus = overId as IssueStatus;
+
+        const targetIssues = issues
+          .filter((item) => item.status === targetStatus && item.id !== issueId)
+          .sort((a, b) => a.position - b.position);
+
+        targetPosition = targetIssues.length;
+      } else {
+        const overIssue = issues.find((item) => item.id === overId);
+
+        if (!overIssue) {
+          return;
+        }
+
+        targetStatus = overIssue.status;
+
+        const targetIssues = issues
+          .filter((item) => item.status === targetStatus && item.id !== issueId)
+          .sort((a, b) => a.position - b.position);
+
+        const index = targetIssues.findIndex(
+          (item) => item.id === overIssue.id,
+        );
+
+        targetPosition = index >= 0 ? index : targetIssues.length;
+      }
+
+      if (issue.status === targetStatus && issue.position === targetPosition) {
+        return;
+      }
+
+      await onMoveIssue(issueId, targetStatus, targetPosition);
+    } finally {
+      onDragActivity(issueId, false);
     }
-
-    if (issue.status === targetStatus && issue.position === targetPosition) {
-      return;
-    }
-
-    await onMoveIssue(issueId, targetStatus, targetPosition);
   }
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragCancel={(event) => {
+        onDragActivity(String(event.active.id), false);
+      }}
       onDragEnd={(event) => {
         void handleDragEnd(event);
       }}
@@ -107,6 +133,7 @@ function KanbanBoard({
           title="To Do"
           status="TODO"
           issues={issues}
+          activities={activities}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
         />
@@ -115,6 +142,7 @@ function KanbanBoard({
           title="In Progress"
           status="IN_PROGRESS"
           issues={issues}
+          activities={activities}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
         />
@@ -123,6 +151,7 @@ function KanbanBoard({
           title="Done"
           status="DONE"
           issues={issues}
+          activities={activities}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
         />

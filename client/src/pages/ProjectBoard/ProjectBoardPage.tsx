@@ -29,7 +29,12 @@ import ProjectPresence from "../../components/kanban/ProjectPresence";
 
 import { useAuth } from "../../hooks/useAuth";
 
-import { getSocket, type PresenceUser } from "../../socket/socket";
+import {
+  getSocket,
+  type IssueActivity,
+  type IssueActivityType,
+  type PresenceUser,
+} from "../../socket/socket";
 
 import {
   addRealtimeIssue,
@@ -52,6 +57,8 @@ function ProjectBoardPage() {
   const [project, setProject] = useState<Project | null>(null);
 
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
+
+  const [issueActivities, setIssueActivities] = useState<IssueActivity[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -136,6 +143,8 @@ function ProjectBoardPage() {
 
       setPresenceUsers([]);
 
+      setIssueActivities([]);
+
       return;
     }
 
@@ -171,12 +180,16 @@ function ProjectBoardPage() {
       setRealtimeConnected(false);
 
       setPresenceUsers([]);
+
+      setIssueActivities([]);
     }
 
     function handleConnectError(error: Error) {
       setRealtimeConnected(false);
 
       setPresenceUsers([]);
+
+      setIssueActivities([]);
 
       setError(error.message || "Unable to connect to real-time server");
     }
@@ -195,6 +208,45 @@ function ProjectBoardPage() {
       }
 
       setPresenceUsers(payload.users);
+    }
+
+    function handleIssueActivity(payload: {
+      workspaceId: string;
+      projectId: string;
+      issueId: string;
+      activity: IssueActivityType;
+      active: boolean;
+      user: PresenceUser;
+    }) {
+      if (!belongsToCurrentProject(payload)) {
+        return;
+      }
+
+      setIssueActivities((currentActivities) => {
+        const matches = (activity: IssueActivity) =>
+          activity.issueId === payload.issueId &&
+          activity.activity === payload.activity &&
+          activity.user.id === payload.user.id;
+
+        if (!payload.active) {
+          return currentActivities.filter((activity) => !matches(activity));
+        }
+
+        if (currentActivities.some(matches)) {
+          return currentActivities;
+        }
+
+        return [
+          ...currentActivities,
+          {
+            issueId: payload.issueId,
+
+            activity: payload.activity,
+
+            user: payload.user,
+          },
+        ];
+      });
     }
 
     function handleIssueCreated(payload: {
@@ -251,6 +303,12 @@ function ProjectBoardPage() {
       setIssues((currentIssues) =>
         deleteRealtimeIssue(currentIssues, payload.issueId),
       );
+
+      setIssueActivities((currentActivities) =>
+        currentActivities.filter(
+          (activity) => activity.issueId !== payload.issueId,
+        ),
+      );
     }
 
     socket.on("connect", joinProjectRoom);
@@ -262,6 +320,8 @@ function ProjectBoardPage() {
     socket.on("socket:error", handleSocketError);
 
     socket.on("presence:updated", handlePresenceUpdated);
+
+    socket.on("issue:activity", handleIssueActivity);
 
     socket.on("issue:created", handleIssueCreated);
 
@@ -282,6 +342,8 @@ function ProjectBoardPage() {
 
       setPresenceUsers([]);
 
+      setIssueActivities([]);
+
       socket.off("connect", joinProjectRoom);
 
       socket.off("disconnect", handleDisconnect);
@@ -291,6 +353,8 @@ function ProjectBoardPage() {
       socket.off("socket:error", handleSocketError);
 
       socket.off("presence:updated", handlePresenceUpdated);
+
+      socket.off("issue:activity", handleIssueActivity);
 
       socket.off("issue:created", handleIssueCreated);
 
@@ -304,6 +368,7 @@ function ProjectBoardPage() {
 
   function emitIssueEvent(
     event: "issue:created" | "issue:updated" | "issue:moved" | "issue:deleted",
+
     issueId: string,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -320,6 +385,30 @@ function ProjectBoardPage() {
       workspaceId,
       projectId,
       issueId,
+    });
+  }
+
+  function emitIssueActivity(
+    issueId: string,
+    activity: IssueActivityType,
+    active: boolean,
+  ) {
+    if (!workspaceId || !projectId || !accessToken) {
+      return;
+    }
+
+    const socket = getSocket(accessToken);
+
+    if (!socket.connected) {
+      return;
+    }
+
+    socket.emit("issue:activity", {
+      workspaceId,
+      projectId,
+      issueId,
+      activity,
+      active,
     });
   }
 
@@ -347,21 +436,25 @@ function ProjectBoardPage() {
       throw new Error("Unable to update issue");
     }
 
-    const updatedIssue = await updateIssue(
-      workspaceId,
-      projectId,
-      issueId,
-      input,
-      accessToken,
-    );
+    try {
+      const updatedIssue = await updateIssue(
+        workspaceId,
+        projectId,
+        issueId,
+        input,
+        accessToken,
+      );
 
-    setIssues((currentIssues) =>
-      updateRealtimeIssue(currentIssues, updatedIssue),
-    );
+      setIssues((currentIssues) =>
+        updateRealtimeIssue(currentIssues, updatedIssue),
+      );
 
-    setEditingIssue(null);
+      setEditingIssue(null);
 
-    emitIssueEvent("issue:updated", updatedIssue.id);
+      emitIssueEvent("issue:updated", updatedIssue.id);
+    } finally {
+      emitIssueActivity(issueId, "EDITING", false);
+    }
   }
 
   async function handleMoveIssue(
@@ -432,7 +525,13 @@ function ProjectBoardPage() {
 
       setIssues((currentIssues) => deleteRealtimeIssue(currentIssues, issueId));
 
+      setIssueActivities((currentActivities) =>
+        currentActivities.filter((activity) => activity.issueId !== issueId),
+      );
+
       if (editingIssue?.id === issueId) {
+        emitIssueActivity(issueId, "EDITING", false);
+
         setEditingIssue(null);
       }
 
@@ -449,6 +548,10 @@ function ProjectBoardPage() {
   }
 
   function handleStartCreate() {
+    if (editingIssue) {
+      emitIssueActivity(editingIssue.id, "EDITING", false);
+    }
+
     setEditingIssue(null);
     setDeletingIssue(null);
     setShowCreateForm(true);
@@ -456,17 +559,39 @@ function ProjectBoardPage() {
   }
 
   function handleStartEdit(issue: Issue) {
+    if (editingIssue && editingIssue.id !== issue.id) {
+      emitIssueActivity(editingIssue.id, "EDITING", false);
+    }
+
     setShowCreateForm(false);
     setDeletingIssue(null);
     setEditingIssue(issue);
     setError(null);
+
+    emitIssueActivity(issue.id, "EDITING", true);
+  }
+
+  function handleCancelEdit() {
+    if (editingIssue) {
+      emitIssueActivity(editingIssue.id, "EDITING", false);
+    }
+
+    setEditingIssue(null);
   }
 
   function handleStartDelete(issue: Issue) {
+    if (editingIssue) {
+      emitIssueActivity(editingIssue.id, "EDITING", false);
+    }
+
     setShowCreateForm(false);
     setEditingIssue(null);
     setDeletingIssue(issue);
     setError(null);
+  }
+
+  function handleDragActivity(issueId: string, active: boolean) {
+    emitIssueActivity(issueId, "DRAGGING", active);
   }
 
   if (loading) {
@@ -583,7 +708,7 @@ function ProjectBoardPage() {
               issue={editingIssue}
               members={members}
               onSave={handleUpdateIssue}
-              onCancel={() => setEditingIssue(null)}
+              onCancel={handleCancelEdit}
             />
           </div>
         )}
@@ -630,9 +755,11 @@ function ProjectBoardPage() {
 
         <KanbanBoard
           issues={issues}
+          activities={issueActivities}
           onMoveIssue={handleMoveIssue}
           onEditIssue={handleStartEdit}
           onDeleteIssue={handleStartDelete}
+          onDragActivity={handleDragActivity}
         />
       </div>
     </main>

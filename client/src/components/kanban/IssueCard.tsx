@@ -4,33 +4,39 @@ import { useSortable } from "@dnd-kit/sortable";
 
 import type { Issue, IssuePriority } from "../../api/issues";
 
+import type { IssueActivity } from "../../socket/socket";
+
 interface IssueCardProps {
   issue: Issue;
+
+  activities: IssueActivity[];
+
   onEdit: (issue: Issue) => void;
+
   onDelete: (issue: Issue) => void;
 }
 
 const priorityStyles: Record<IssuePriority, string> = {
-  LOW: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  LOW: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
 
-  MEDIUM: "bg-blue-500/10 text-blue-300 border-blue-500/30",
+  MEDIUM: "border-blue-500/30 bg-blue-500/10 text-blue-300",
 
-  HIGH: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+  HIGH: "border-amber-500/30 bg-amber-500/10 text-amber-300",
 
-  URGENT: "bg-red-500/10 text-red-300 border-red-500/30",
+  URGENT: "border-red-500/30 bg-red-500/10 text-red-300",
 };
 
 function getInitials(name: string) {
   return name
     .trim()
     .split(/\s+/)
-    .map((part) => part[0])
+    .map((part) => part[0] ?? "")
     .join("")
     .slice(0, 2)
     .toUpperCase();
 }
 
-function IssueCard({ issue, onEdit, onDelete }: IssueCardProps) {
+function IssueCard({ issue, activities, onEdit, onDelete }: IssueCardProps) {
   const {
     attributes,
     listeners,
@@ -40,6 +46,7 @@ function IssueCard({ issue, onEdit, onDelete }: IssueCardProps) {
     isDragging,
   } = useSortable({
     id: issue.id,
+
     data: {
       issue,
       type: "issue",
@@ -48,6 +55,7 @@ function IssueCard({ issue, onEdit, onDelete }: IssueCardProps) {
 
   const style = {
     transform: CSS.Transform.toString(transform),
+
     transition,
   };
 
@@ -58,20 +66,36 @@ function IssueCard({ issue, onEdit, onDelete }: IssueCardProps) {
       {...attributes}
       {...listeners}
       className={`
-        cursor-grab rounded-xl border border-slate-700
-        bg-slate-800 p-4 shadow-sm transition
-        hover:border-slate-600 hover:bg-slate-800/90
+        cursor-grab rounded-xl border bg-slate-800 p-4 shadow-sm transition
         active:cursor-grabbing
+        ${activities.length > 0 ? "border-cyan-500/60" : "border-slate-700"}
         ${isDragging ? "opacity-50" : ""}
       `}
     >
+      {activities.length > 0 && (
+        <div className="mb-3 space-y-1">
+          {activities.map((activity) => (
+            <div
+              key={`${activity.user.id}-${activity.activity}`}
+              className="flex items-center gap-2 rounded-lg bg-cyan-500/10 px-2.5 py-1.5 text-xs text-cyan-300"
+            >
+              <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
+
+              <span>
+                <span className="font-semibold">{activity.user.name}</span> is{" "}
+                {activity.activity === "EDITING" ? "editing" : "dragging"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mb-3 flex items-start justify-between gap-3">
         <h3 className="font-semibold leading-6 text-white">{issue.title}</h3>
 
         <span
           className={`
-            shrink-0 rounded-full border px-2.5 py-1
-            text-[11px] font-semibold
+            shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold
             ${priorityStyles[issue.priority]}
           `}
         >
@@ -109,6 +133,7 @@ function IssueCard({ issue, onEdit, onDelete }: IssueCardProps) {
             type="button"
             onClick={(event) => {
               event.stopPropagation();
+
               onEdit(issue);
             }}
             onPointerDown={(event) => {
@@ -123,6 +148,7 @@ function IssueCard({ issue, onEdit, onDelete }: IssueCardProps) {
             type="button"
             onClick={(event) => {
               event.stopPropagation();
+
               onDelete(issue);
             }}
             onPointerDown={(event) => {

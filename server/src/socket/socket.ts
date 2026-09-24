@@ -15,6 +15,13 @@ interface IssueMutationPayload extends ProjectRoomPayload {
   issueId: string;
 }
 
+type IssueActivityType = "EDITING" | "DRAGGING";
+
+interface IssueActivityInput extends IssueMutationPayload {
+  activity: IssueActivityType;
+  active: boolean;
+}
+
 interface RealtimeIssueUser {
   id: string;
   name: string;
@@ -61,8 +68,23 @@ interface PresencePayload extends ProjectRoomPayload {
   users: PresenceUser[];
 }
 
+interface IssueActivityPayload extends ProjectRoomPayload {
+  issueId: string;
+
+  activity: IssueActivityType;
+
+  active: boolean;
+
+  user: PresenceUser;
+}
+
 interface SocketErrorPayload {
   message: string;
+}
+
+interface ActiveSocketActivity extends ProjectRoomPayload {
+  issueId: string;
+  activity: IssueActivityType;
 }
 
 interface ServerToClientEvents {
@@ -73,6 +95,8 @@ interface ServerToClientEvents {
   "issue:moved": (payload: IssueRealtimePayload) => void;
 
   "issue:deleted": (payload: IssueDeletedPayload) => void;
+
+  "issue:activity": (payload: IssueActivityPayload) => void;
 
   "presence:updated": (payload: PresencePayload) => void;
 
@@ -91,6 +115,8 @@ interface ClientToServerEvents {
   "issue:moved": (payload: IssueMutationPayload) => void;
 
   "issue:deleted": (payload: IssueDeletedPayload) => void;
+
+  "issue:activity": (payload: IssueActivityInput) => void;
 }
 
 interface SocketData {
@@ -99,6 +125,8 @@ interface SocketData {
   email: string;
 
   joinedProjects: ProjectRoomPayload[];
+
+  activeActivities: ActiveSocketActivity[];
 }
 
 type CollabFlowSocket = Socket<
@@ -130,6 +158,14 @@ function isValidIssuePayload(payload: IssueMutationPayload) {
   );
 }
 
+function isValidActivityPayload(payload: IssueActivityInput) {
+  return Boolean(
+    isValidIssuePayload(payload) &&
+    (payload.activity === "EDITING" || payload.activity === "DRAGGING") &&
+    typeof payload.active === "boolean",
+  );
+}
+
 function projectAlreadyJoined(
   projects: ProjectRoomPayload[],
   workspaceId: string,
@@ -138,6 +174,18 @@ function projectAlreadyJoined(
   return projects.some(
     (project) =>
       project.workspaceId === workspaceId && project.projectId === projectId,
+  );
+}
+
+function activityMatches(
+  activity: ActiveSocketActivity,
+  payload: IssueActivityInput,
+) {
+  return (
+    activity.workspaceId === payload.workspaceId &&
+    activity.projectId === payload.projectId &&
+    activity.issueId === payload.issueId &&
+    activity.activity === payload.activity
   );
 }
 
@@ -319,6 +367,30 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
   }
 
+  function emitActivity(socket: CollabFlowSocket, payload: IssueActivityInput) {
+    const room = getProjectRoom(payload.workspaceId, payload.projectId);
+
+    socket.to(room).emit("issue:activity", {
+      workspaceId: payload.workspaceId,
+
+      projectId: payload.projectId,
+
+      issueId: payload.issueId,
+
+      activity: payload.activity,
+
+      active: payload.active,
+
+      user: {
+        id: socket.data.userId,
+
+        name: socket.data.name,
+
+        email: socket.data.email,
+      },
+    });
+  }
+
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.accessToken;
@@ -357,6 +429,8 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
       socket.data.joinedProjects = [];
 
+      socket.data.activeActivities = [];
+
       next();
     } catch {
       next(new Error("Invalid or expired authentication token"));
@@ -367,6 +441,8 @@ export function initializeSocketServer(httpServer: HttpServer) {
     console.log(`Socket connected: ${socket.id} user=${socket.data.userId}`);
 
     let disconnectedProjects: ProjectRoomPayload[] = [];
+
+    let disconnectedActivities: ActiveSocketActivity[] = [];
 
     socket.on("project:join", async (payload) => {
       if (!isValidProjectPayload(payload)) {
@@ -410,8 +486,6 @@ export function initializeSocketServer(httpServer: HttpServer) {
           });
         }
 
-        console.log(`Socket ${socket.id} joined ${room}`);
-
         await emitProjectPresence(payload.workspaceId, payload.projectId);
       } catch (error) {
         console.error("Unable to join project room:", error);
@@ -426,6 +500,27 @@ export function initializeSocketServer(httpServer: HttpServer) {
       if (!isValidProjectPayload(payload)) {
         return;
       }
+
+      const relatedActivities = socket.data.activeActivities.filter(
+        (activity) =>
+          activity.workspaceId === payload.workspaceId &&
+          activity.projectId === payload.projectId,
+      );
+
+      for (const activity of relatedActivities) {
+        emitActivity(socket, {
+          ...activity,
+          active: false,
+        });
+      }
+
+      socket.data.activeActivities = socket.data.activeActivities.filter(
+        (activity) =>
+          !(
+            activity.workspaceId === payload.workspaceId &&
+            activity.projectId === payload.projectId
+          ),
+      );
 
       const room = getProjectRoom(payload.workspaceId, payload.projectId);
 
@@ -442,16 +537,45 @@ export function initializeSocketServer(httpServer: HttpServer) {
       await emitProjectPresence(payload.workspaceId, payload.projectId);
     });
 
-    socket.on("issue:created", async (payload) => {
-      if (!isValidIssuePayload(payload)) {
+    socket.on("issue:activity", (payload) => {
+      if (!isValidActivityPayload(payload)) {
         return;
       }
 
       if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
-        socket.emit("socket:error", {
-          message: "You are not authorized for this project room",
-        });
+        return;
+      }
 
+      if (payload.active) {
+        const exists = socket.data.activeActivities.some((activity) =>
+          activityMatches(activity, payload),
+        );
+
+        if (!exists) {
+          socket.data.activeActivities.push({
+            workspaceId: payload.workspaceId,
+
+            projectId: payload.projectId,
+
+            issueId: payload.issueId,
+
+            activity: payload.activity,
+          });
+        }
+      } else {
+        socket.data.activeActivities = socket.data.activeActivities.filter(
+          (activity) => !activityMatches(activity, payload),
+        );
+      }
+
+      emitActivity(socket, payload);
+    });
+
+    socket.on("issue:created", async (payload) => {
+      if (
+        !isValidIssuePayload(payload) ||
+        !isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)
+      ) {
         return;
       }
 
@@ -477,11 +601,10 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
 
     socket.on("issue:updated", async (payload) => {
-      if (!isValidIssuePayload(payload)) {
-        return;
-      }
-
-      if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
+      if (
+        !isValidIssuePayload(payload) ||
+        !isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)
+      ) {
         return;
       }
 
@@ -507,11 +630,10 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
 
     socket.on("issue:moved", async (payload) => {
-      if (!isValidIssuePayload(payload)) {
-        return;
-      }
-
-      if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
+      if (
+        !isValidIssuePayload(payload) ||
+        !isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)
+      ) {
         return;
       }
 
@@ -537,11 +659,10 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
 
     socket.on("issue:deleted", (payload) => {
-      if (!isValidIssuePayload(payload)) {
-        return;
-      }
-
-      if (!isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)) {
+      if (
+        !isValidIssuePayload(payload) ||
+        !isAuthorizedRoom(socket, payload.workspaceId, payload.projectId)
+      ) {
         return;
       }
 
@@ -558,10 +679,36 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
     socket.on("disconnecting", () => {
       disconnectedProjects = [...socket.data.joinedProjects];
+
+      disconnectedActivities = [...socket.data.activeActivities];
     });
 
     socket.on("disconnect", (reason) => {
       console.log(`Socket disconnected: ${socket.id} (${reason})`);
+
+      for (const activity of disconnectedActivities) {
+        const room = getProjectRoom(activity.workspaceId, activity.projectId);
+
+        io.to(room).emit("issue:activity", {
+          workspaceId: activity.workspaceId,
+
+          projectId: activity.projectId,
+
+          issueId: activity.issueId,
+
+          activity: activity.activity,
+
+          active: false,
+
+          user: {
+            id: socket.data.userId,
+
+            name: socket.data.name,
+
+            email: socket.data.email,
+          },
+        });
+      }
 
       for (const project of disconnectedProjects) {
         void emitProjectPresence(project.workspaceId, project.projectId);

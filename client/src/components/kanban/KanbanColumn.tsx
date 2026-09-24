@@ -7,12 +7,18 @@ import {
 
 import type { Issue, IssueStatus } from "../../api/issues";
 
+import type { IssueActivity } from "../../socket/socket";
+
 import IssueCard from "./IssueCard";
 
 interface KanbanColumnProps {
   title: string;
+
   status: IssueStatus;
+
   issues: Issue[];
+
+  activities: IssueActivity[];
 
   onEditIssue: (issue: Issue) => void;
 
@@ -23,11 +29,13 @@ function KanbanColumn({
   title,
   status,
   issues,
+  activities,
   onEditIssue,
   onDeleteIssue,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
+
     data: {
       type: "column",
       status,
@@ -42,8 +50,7 @@ function KanbanColumn({
     <section
       ref={setNodeRef}
       className={`
-        min-w-0 rounded-2xl border
-        bg-slate-900/70 p-4 transition
+        min-w-0 rounded-2xl border bg-slate-900/70 p-4 transition
         ${isOver ? "border-cyan-500 bg-slate-900" : "border-slate-800"}
       `}
     >
@@ -71,6 +78,9 @@ function KanbanColumn({
               <IssueCard
                 key={issue.id}
                 issue={issue}
+                activities={activities.filter(
+                  (activity) => activity.issueId === issue.id,
+                )}
                 onEdit={onEditIssue}
                 onDelete={onDeleteIssue}
               />

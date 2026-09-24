@@ -8,6 +8,16 @@ export interface PresenceUser {
   email: string;
 }
 
+export type IssueActivityType = "EDITING" | "DRAGGING";
+
+export interface IssueActivity {
+  issueId: string;
+
+  activity: IssueActivityType;
+
+  user: PresenceUser;
+}
+
 interface ProjectRoomPayload {
   workspaceId: string;
   projectId: string;
@@ -15,6 +25,11 @@ interface ProjectRoomPayload {
 
 interface IssueMutationPayload extends ProjectRoomPayload {
   issueId: string;
+}
+
+interface IssueActivityInput extends IssueMutationPayload {
+  activity: IssueActivityType;
+  active: boolean;
 }
 
 interface IssueRealtimePayload extends ProjectRoomPayload {
@@ -29,6 +44,13 @@ interface PresencePayload extends ProjectRoomPayload {
   users: PresenceUser[];
 }
 
+interface IssueActivityPayload extends ProjectRoomPayload {
+  issueId: string;
+  activity: IssueActivityType;
+  active: boolean;
+  user: PresenceUser;
+}
+
 interface SocketErrorPayload {
   message: string;
 }
@@ -41,6 +63,8 @@ interface ServerToClientEvents {
   "issue:moved": (payload: IssueRealtimePayload) => void;
 
   "issue:deleted": (payload: IssueDeletedPayload) => void;
+
+  "issue:activity": (payload: IssueActivityPayload) => void;
 
   "presence:updated": (payload: PresencePayload) => void;
 
@@ -59,6 +83,8 @@ interface ClientToServerEvents {
   "issue:moved": (payload: IssueMutationPayload) => void;
 
   "issue:deleted": (payload: IssueDeletedPayload) => void;
+
+  "issue:activity": (payload: IssueActivityInput) => void;
 }
 
 export type CollabFlowSocket = Socket<
