@@ -15,6 +15,7 @@ import { requireCurrentIssueVersion } from "../middleware/issueConflict.middlewa
 
 import { recordIssueActivity } from "../middleware/issueActivity.middleware.js";
 
+import checklistRoutes from "./checklist.routes.js";
 import commentRoutes from "./comment.routes.js";
 
 const router = Router({
@@ -26,6 +27,8 @@ router.get("/", requireAuth, getIssues);
 router.post("/", requireAuth, recordIssueActivity("CREATED"), createIssue);
 
 router.use("/:issueId/comments", commentRoutes);
+
+router.use("/:issueId/checklist", checklistRoutes);
 
 router.patch(
   "/:issueId/move",

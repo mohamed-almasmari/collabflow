@@ -6,6 +6,8 @@ import type { Issue } from "../../api/issues";
 
 import type { IssueActivity } from "../../socket/socket";
 
+import IssueChecklist from "./IssueChecklist";
+
 interface IssueCardProps {
   issue: Issue;
 
@@ -64,9 +66,9 @@ function getDueDateInfo(issue: Issue) {
 
   const dueDateValue = new Date(`${dueDate}T00:00:00`);
 
-  const differenceMs = dueDateValue.getTime() - todayDate.getTime();
-
-  const differenceDays = Math.round(differenceMs / 86_400_000);
+  const differenceDays = Math.round(
+    (dueDateValue.getTime() - todayDate.getTime()) / 86_400_000,
+  );
 
   const formatted = new Intl.DateTimeFormat(undefined, {
     month: "short",
@@ -179,11 +181,6 @@ function IssueCard({
           type="button"
           {...attributes}
           {...listeners}
-          onPointerDown={(event) => {
-            listeners?.onPointerDown?.(event);
-
-            onDragActivity(issue.id, true);
-          }}
           onPointerUp={() => {
             onDragActivity(issue.id, false);
           }}
@@ -265,6 +262,8 @@ function IssueCard({
           ))}
         </div>
       )}
+
+      <IssueChecklist issueId={issue.id} />
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-800 pt-3">
         <div className="min-w-0">

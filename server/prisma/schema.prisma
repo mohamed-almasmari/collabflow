@@ -148,8 +148,9 @@ model Issue {
 
   issueLabels IssueLabel[]
 
-  comments      Comment[]
-  notifications Notification[]
+  checklistItems ChecklistItem[]
+  comments       Comment[]
+  notifications  Notification[]
 
   @@index([projectId])
   @@index([createdById])
@@ -157,6 +158,21 @@ model Issue {
   @@index([status])
   @@index([dueDate])
   @@index([projectId, status, position])
+}
+
+model ChecklistItem {
+  id        String   @id @default(uuid())
+  title     String
+  completed Boolean  @default(false)
+  position  Int      @default(0)
+  issueId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([issueId, position])
 }
 
 model Label {
