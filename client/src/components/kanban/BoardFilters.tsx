@@ -1,12 +1,20 @@
 import type { WorkspaceMember } from "../../api/workspaces";
 
-type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
+export type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
 
-type PriorityFilter = "ALL" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type PriorityFilter = "ALL" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
-type SortOption =
+export type DueDateFilter =
+  | "ALL"
+  | "OVERDUE"
+  | "TODAY"
+  | "NEXT_7_DAYS"
+  | "NO_DUE_DATE";
+
+export type SortOption =
   | "BOARD"
   | "PRIORITY"
+  | "DUE_DATE"
   | "UPDATED_DESC"
   | "UPDATED_ASC"
   | "TITLE";
@@ -17,6 +25,8 @@ interface BoardFiltersProps {
   statusFilter: StatusFilter;
 
   priorityFilter: PriorityFilter;
+
+  dueDateFilter: DueDateFilter;
 
   assigneeFilter: string;
 
@@ -36,6 +46,8 @@ interface BoardFiltersProps {
 
   onPriorityChange: (value: PriorityFilter) => void;
 
+  onDueDateChange: (value: DueDateFilter) => void;
+
   onAssigneeChange: (value: string) => void;
 
   onSortChange: (value: SortOption) => void;
@@ -49,6 +61,7 @@ function BoardFilters({
   searchText,
   statusFilter,
   priorityFilter,
+  dueDateFilter,
   assigneeFilter,
   sortOption,
   myIssuesOnly,
@@ -58,6 +71,7 @@ function BoardFilters({
   onSearchChange,
   onStatusChange,
   onPriorityChange,
+  onDueDateChange,
   onAssigneeChange,
   onSortChange,
   onMyIssuesChange,
@@ -67,6 +81,7 @@ function BoardFilters({
     searchText.trim().length > 0 ||
     statusFilter !== "ALL" ||
     priorityFilter !== "ALL" ||
+    dueDateFilter !== "ALL" ||
     assigneeFilter !== "ALL" ||
     sortOption !== "BOARD" ||
     myIssuesOnly;
@@ -96,7 +111,7 @@ function BoardFilters({
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div>
           <label
             htmlFor="issue-search"
@@ -171,6 +186,34 @@ function BoardFilters({
 
         <div>
           <label
+            htmlFor="due-date-filter"
+            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Deadline
+          </label>
+
+          <select
+            id="due-date-filter"
+            value={dueDateFilter}
+            onChange={(event) =>
+              onDueDateChange(event.target.value as DueDateFilter)
+            }
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All deadlines</option>
+
+            <option value="OVERDUE">Overdue</option>
+
+            <option value="TODAY">Due today</option>
+
+            <option value="NEXT_7_DAYS">Due next 7 days</option>
+
+            <option value="NO_DUE_DATE">No due date</option>
+          </select>
+        </div>
+
+        <div>
+          <label
             htmlFor="assignee-filter"
             className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
           >
@@ -212,6 +255,8 @@ function BoardFilters({
             <option value="BOARD">Board order</option>
 
             <option value="PRIORITY">Priority</option>
+
+            <option value="DUE_DATE">Due date</option>
 
             <option value="UPDATED_DESC">Recently updated</option>
 

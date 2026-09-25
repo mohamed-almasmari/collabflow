@@ -27,8 +27,16 @@ import {
 
 import ActivityTimeline from "../../components/Activity/ActivityTimeline";
 import CommentsPanel from "../../components/Comments/CommentsPanel";
+
 import BoardActions from "../../components/Kanban/BoardActions";
-import BoardFilters from "../../components/Kanban/BoardFilters";
+
+import BoardFilters, {
+  type DueDateFilter,
+  type PriorityFilter,
+  type SortOption,
+  type StatusFilter,
+} from "../../components/Kanban/BoardFilters";
+
 import BoardStats from "../../components/Kanban/BoardStats";
 import CreateIssueForm from "../../components/Kanban/CreateIssueForm";
 import EditIssueForm from "../../components/Kanban/EditIssueForm";
@@ -50,17 +58,6 @@ import {
   moveRealtimeIssue,
   updateRealtimeIssue,
 } from "../../utils/issueRealtime";
-
-type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
-
-type PriorityFilter = "ALL" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-
-type SortOption =
-  | "BOARD"
-  | "PRIORITY"
-  | "UPDATED_DESC"
-  | "UPDATED_ASC"
-  | "TITLE";
 
 function getStatusFilter(value: string | null): StatusFilter {
   switch (value) {
@@ -87,9 +84,23 @@ function getPriorityFilter(value: string | null): PriorityFilter {
   }
 }
 
+function getDueDateFilter(value: string | null): DueDateFilter {
+  switch (value) {
+    case "OVERDUE":
+    case "TODAY":
+    case "NEXT_7_DAYS":
+    case "NO_DUE_DATE":
+      return value;
+
+    default:
+      return "ALL";
+  }
+}
+
 function getSortOption(value: string | null): SortOption {
   switch (value) {
     case "PRIORITY":
+    case "DUE_DATE":
     case "UPDATED_DESC":
     case "UPDATED_ASC":
     case "TITLE":
@@ -107,6 +118,28 @@ const priorityOrder = {
   LOW: 3,
 } as const;
 
+function getTodayKey() {
+  const today = new Date();
+
+  const year = today.getFullYear();
+
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getDateDifference(date: string) {
+  const todayKey = getTodayKey();
+
+  const today = new Date(`${todayKey}T00:00:00`);
+
+  const target = new Date(`${date.slice(0, 10)}T00:00:00`);
+
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
 function ProjectBoardPage() {
   const { workspaceId, projectId } = useParams();
 
@@ -121,6 +154,8 @@ function ProjectBoardPage() {
   const statusFilter = getStatusFilter(searchParams.get("status"));
 
   const priorityFilter = getPriorityFilter(searchParams.get("priority"));
+
+  const dueDateFilter = getDueDateFilter(searchParams.get("due"));
 
   const assigneeFilter = searchParams.get("assignee") ?? "ALL";
 
@@ -180,25 +215,84 @@ function ProjectBoardPage() {
         (assigneeFilter === "UNASSIGNED" && !issue.assigneeId) ||
         issue.assigneeId === assigneeFilter;
 
-      const matchesMine =
-        !myIssuesOnly || (Boolean(user?.id) && issue.assigneeId === user?.id);
+      const matchesMine = !myIssuesOnly || issue.assigneeId === user?.id;
+
+      let matchesDueDate = true;
+
+      if (dueDateFilter !== "ALL") {
+        if (dueDateFilter === "NO_DUE_DATE") {
+          matchesDueDate = !issue.dueDate;
+        } else if (!issue.dueDate) {
+          matchesDueDate = false;
+        } else {
+          const difference = getDateDifference(issue.dueDate);
+
+          switch (dueDateFilter) {
+            case "OVERDUE":
+              matchesDueDate = issue.status !== "DONE" && difference < 0;
+              break;
+
+            case "TODAY":
+              matchesDueDate = difference === 0;
+              break;
+
+            case "NEXT_7_DAYS":
+              matchesDueDate = difference >= 0 && difference <= 7;
+              break;
+
+            default:
+              matchesDueDate = true;
+          }
+        }
+      }
 
       return (
         matchesSearch &&
         matchesStatus &&
         matchesPriority &&
         matchesAssignee &&
-        matchesMine
+        matchesMine &&
+        matchesDueDate
       );
     });
 
     return [...filtered].sort((firstIssue, secondIssue) => {
       switch (sortOption) {
-        case "PRIORITY":
-          return (
+        case "PRIORITY": {
+          const difference =
             priorityOrder[firstIssue.priority] -
-            priorityOrder[secondIssue.priority]
+            priorityOrder[secondIssue.priority];
+
+          if (difference !== 0) {
+            return difference;
+          }
+
+          return firstIssue.position - secondIssue.position;
+        }
+
+        case "DUE_DATE": {
+          if (!firstIssue.dueDate && !secondIssue.dueDate) {
+            return firstIssue.position - secondIssue.position;
+          }
+
+          if (!firstIssue.dueDate) {
+            return 1;
+          }
+
+          if (!secondIssue.dueDate) {
+            return -1;
+          }
+
+          const difference = firstIssue.dueDate.localeCompare(
+            secondIssue.dueDate,
           );
+
+          if (difference !== 0) {
+            return difference;
+          }
+
+          return firstIssue.position - secondIssue.position;
+        }
 
         case "UPDATED_DESC":
           return (
@@ -217,11 +311,7 @@ function ProjectBoardPage() {
 
         case "BOARD":
         default:
-          if (firstIssue.status === secondIssue.status) {
-            return firstIssue.position - secondIssue.position;
-          }
-
-          return 0;
+          return firstIssue.position - secondIssue.position;
       }
     });
   }, [
@@ -229,6 +319,7 @@ function ProjectBoardPage() {
     searchText,
     statusFilter,
     priorityFilter,
+    dueDateFilter,
     assigneeFilter,
     sortOption,
     myIssuesOnly,
@@ -646,9 +737,7 @@ function ProjectBoardPage() {
     setSearchParams((currentParams) => {
       const nextParams = new URLSearchParams(currentParams);
 
-      const trimmedValue = value.trim();
-
-      if (trimmedValue.length === 0 || value === defaultValue) {
+      if (value.trim().length === 0 || value === defaultValue) {
         nextParams.delete(key);
       } else {
         nextParams.set(key, value);
@@ -668,6 +757,10 @@ function ProjectBoardPage() {
 
   function handlePriorityChange(value: PriorityFilter) {
     setQueryParameter("priority", value, "ALL");
+  }
+
+  function handleDueDateChange(value: DueDateFilter) {
+    setQueryParameter("due", value, "ALL");
   }
 
   function handleAssigneeChange(value: string) {
@@ -701,6 +794,8 @@ function ProjectBoardPage() {
       nextParams.delete("status");
 
       nextParams.delete("priority");
+
+      nextParams.delete("due");
 
       nextParams.delete("assignee");
 
@@ -1227,6 +1322,7 @@ function ProjectBoardPage() {
           searchText={searchText}
           statusFilter={statusFilter}
           priorityFilter={priorityFilter}
+          dueDateFilter={dueDateFilter}
           assigneeFilter={assigneeFilter}
           sortOption={sortOption}
           myIssuesOnly={myIssuesOnly}
@@ -1236,6 +1332,7 @@ function ProjectBoardPage() {
           onSearchChange={handleSearchChange}
           onStatusChange={handleStatusChange}
           onPriorityChange={handlePriorityChange}
+          onDueDateChange={handleDueDateChange}
           onAssigneeChange={handleAssigneeChange}
           onSortChange={handleSortChange}
           onMyIssuesChange={handleMyIssuesChange}

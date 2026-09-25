@@ -60,9 +60,7 @@ function KanbanBoard({
   );
 
   function getIssuesByStatus(status: IssueStatus) {
-    return issues
-      .filter((issue) => issue.status === status)
-      .sort((first, second) => first.position - second.position);
+    return issues.filter((issue) => issue.status === status);
   }
 
   function handleDragStart(event: DragStartEvent) {
