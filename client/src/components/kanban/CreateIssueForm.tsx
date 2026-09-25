@@ -2,10 +2,14 @@ import { useState, type SyntheticEvent } from "react";
 
 import type { CreateIssueInput, IssuePriority } from "../../api/issues";
 
+import type { Label } from "../../api/labels";
+
 import type { WorkspaceMember } from "../../api/workspaces";
 
 interface CreateIssueFormProps {
   members: WorkspaceMember[];
+
+  labels: Label[];
 
   onCreate: (input: CreateIssueInput) => Promise<void>;
 
@@ -14,6 +18,7 @@ interface CreateIssueFormProps {
 
 function CreateIssueForm({
   members,
+  labels,
   onCreate,
   onCancel,
 }: CreateIssueFormProps) {
@@ -27,9 +32,19 @@ function CreateIssueForm({
 
   const [dueDate, setDueDate] = useState("");
 
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+
+  function toggleLabel(labelId: string) {
+    setSelectedLabelIds((current) =>
+      current.includes(labelId)
+        ? current.filter((id) => id !== labelId)
+        : [...current, labelId],
+    );
+  }
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,6 +72,8 @@ function CreateIssueForm({
         assigneeId: assigneeId || null,
 
         dueDate: dueDate || null,
+
+        labelIds: selectedLabelIds,
       });
     } catch (submitError) {
       setError(
@@ -203,8 +220,48 @@ function CreateIssueForm({
             onChange={(event) => setDueDate(event.target.value)}
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
           />
+        </div>
 
-          <p className="mt-1 text-xs text-slate-500">Optional</p>
+        <div className="lg:col-span-2">
+          <p className="mb-3 block text-sm font-medium text-slate-300">
+            Labels
+          </p>
+
+          {labels.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No project labels have been created yet.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {labels.map((label) => {
+                const selected = selectedLabelIds.includes(label.id);
+
+                return (
+                  <label
+                    key={label.id}
+                    className={`
+                        flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition
+                        ${selected ? "bg-slate-800" : "bg-slate-950"}
+                      `}
+                    style={{
+                      borderColor: label.color,
+
+                      color: label.color,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleLabel(label.id)}
+                      className="h-3.5 w-3.5"
+                    />
+
+                    {label.name}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

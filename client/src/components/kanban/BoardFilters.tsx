@@ -1,3 +1,5 @@
+import type { Label } from "../../api/labels";
+
 import type { WorkspaceMember } from "../../api/workspaces";
 
 export type StatusFilter = "ALL" | "TODO" | "IN_PROGRESS" | "DONE";
@@ -30,11 +32,15 @@ interface BoardFiltersProps {
 
   assigneeFilter: string;
 
+  labelFilter: string;
+
   sortOption: SortOption;
 
   myIssuesOnly: boolean;
 
   members: WorkspaceMember[];
+
+  labels: Label[];
 
   filteredCount: number;
 
@@ -50,6 +56,8 @@ interface BoardFiltersProps {
 
   onAssigneeChange: (value: string) => void;
 
+  onLabelChange: (value: string) => void;
+
   onSortChange: (value: SortOption) => void;
 
   onMyIssuesChange: (value: boolean) => void;
@@ -63,9 +71,11 @@ function BoardFilters({
   priorityFilter,
   dueDateFilter,
   assigneeFilter,
+  labelFilter,
   sortOption,
   myIssuesOnly,
   members,
+  labels,
   filteredCount,
   totalCount,
   onSearchChange,
@@ -73,6 +83,7 @@ function BoardFilters({
   onPriorityChange,
   onDueDateChange,
   onAssigneeChange,
+  onLabelChange,
   onSortChange,
   onMyIssuesChange,
   onClear,
@@ -83,6 +94,7 @@ function BoardFilters({
     priorityFilter !== "ALL" ||
     dueDateFilter !== "ALL" ||
     assigneeFilter !== "ALL" ||
+    labelFilter !== "ALL" ||
     sortOption !== "BOARD" ||
     myIssuesOnly;
 
@@ -111,7 +123,7 @@ function BoardFilters({
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div>
           <label
             htmlFor="issue-search"
@@ -126,7 +138,7 @@ function BoardFilters({
             value={searchText}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Search issues..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-500"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-500"
           />
         </div>
 
@@ -240,6 +252,30 @@ function BoardFilters({
 
         <div>
           <label
+            htmlFor="label-filter"
+            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Label
+          </label>
+
+          <select
+            id="label-filter"
+            value={labelFilter}
+            onChange={(event) => onLabelChange(event.target.value)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
+          >
+            <option value="ALL">All labels</option>
+
+            {labels.map((label) => (
+              <option key={label.id} value={label.id}>
+                {label.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label
             htmlFor="sort-filter"
             className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
           >
@@ -273,7 +309,7 @@ function BoardFilters({
             type="checkbox"
             checked={myIssuesOnly}
             onChange={(event) => onMyIssuesChange(event.target.checked)}
-            className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+            className="h-4 w-4 rounded border-slate-600 bg-slate-950"
           />
 
           <div>

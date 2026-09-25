@@ -17,6 +17,8 @@ import {
   type UpdateIssueInput,
 } from "../../api/issues";
 
+import { getLabels, type Label } from "../../api/labels";
+
 import { getProjectById, type Project } from "../../api/projects";
 
 import {
@@ -27,7 +29,6 @@ import {
 
 import ActivityTimeline from "../../components/Activity/ActivityTimeline";
 import CommentsPanel from "../../components/Comments/CommentsPanel";
-
 import BoardActions from "../../components/Kanban/BoardActions";
 
 import BoardFilters, {
@@ -41,6 +42,7 @@ import BoardStats from "../../components/Kanban/BoardStats";
 import CreateIssueForm from "../../components/Kanban/CreateIssueForm";
 import EditIssueForm from "../../components/Kanban/EditIssueForm";
 import KanbanBoard from "../../components/Kanban/KanbanBoard";
+import LabelManager from "../../components/Kanban/LabelManager";
 import ProjectPresence from "../../components/Kanban/ProjectPresence";
 
 import { useAuth } from "../../hooks/useAuth";
@@ -131,9 +133,7 @@ function getTodayKey() {
 }
 
 function getDateDifference(date: string) {
-  const todayKey = getTodayKey();
-
-  const today = new Date(`${todayKey}T00:00:00`);
+  const today = new Date(`${getTodayKey()}T00:00:00`);
 
   const target = new Date(`${date.slice(0, 10)}T00:00:00`);
 
@@ -159,6 +159,8 @@ function ProjectBoardPage() {
 
   const assigneeFilter = searchParams.get("assignee") ?? "ALL";
 
+  const labelFilter = searchParams.get("label") ?? "ALL";
+
   const sortOption = getSortOption(searchParams.get("sort"));
 
   const myIssuesOnly = searchParams.get("mine") === "true";
@@ -166,6 +168,8 @@ function ProjectBoardPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
 
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
+
+  const [labels, setLabels] = useState<Label[]>([]);
 
   const [activities, setActivities] = useState<ActivityLog[]>([]);
 
@@ -217,6 +221,10 @@ function ProjectBoardPage() {
 
       const matchesMine = !myIssuesOnly || issue.assigneeId === user?.id;
 
+      const matchesLabel =
+        labelFilter === "ALL" ||
+        issue.issueLabels.some(({ label }) => label.id === labelFilter);
+
       let matchesDueDate = true;
 
       if (dueDateFilter !== "ALL") {
@@ -252,6 +260,7 @@ function ProjectBoardPage() {
         matchesPriority &&
         matchesAssignee &&
         matchesMine &&
+        matchesLabel &&
         matchesDueDate
       );
     });
@@ -263,11 +272,7 @@ function ProjectBoardPage() {
             priorityOrder[firstIssue.priority] -
             priorityOrder[secondIssue.priority];
 
-          if (difference !== 0) {
-            return difference;
-          }
-
-          return firstIssue.position - secondIssue.position;
+          return difference || firstIssue.position - secondIssue.position;
         }
 
         case "DUE_DATE": {
@@ -283,15 +288,7 @@ function ProjectBoardPage() {
             return -1;
           }
 
-          const difference = firstIssue.dueDate.localeCompare(
-            secondIssue.dueDate,
-          );
-
-          if (difference !== 0) {
-            return difference;
-          }
-
-          return firstIssue.position - secondIssue.position;
+          return firstIssue.dueDate.localeCompare(secondIssue.dueDate);
         }
 
         case "UPDATED_DESC":
@@ -321,6 +318,7 @@ function ProjectBoardPage() {
     priorityFilter,
     dueDateFilter,
     assigneeFilter,
+    labelFilter,
     sortOption,
     myIssuesOnly,
     user?.id,
@@ -367,7 +365,7 @@ function ProjectBoardPage() {
 
         setError(null);
 
-        const [issueData, workspaceData, projectData, activityData] =
+        const [issueData, workspaceData, projectData, activityData, labelData] =
           await Promise.all([
             getIssues(currentWorkspaceId, currentProjectId, currentAccessToken),
 
@@ -384,6 +382,8 @@ function ProjectBoardPage() {
               currentProjectId,
               currentAccessToken,
             ),
+
+            getLabels(currentWorkspaceId, currentProjectId, currentAccessToken),
           ]);
 
         if (cancelled) {
@@ -399,6 +399,8 @@ function ProjectBoardPage() {
         setProject(projectData);
 
         setActivities(activityData);
+
+        setLabels(labelData);
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -492,11 +494,7 @@ function ProjectBoardPage() {
     function handleConnectError(socketError: Error) {
       setRealtimeConnected(false);
 
-      setPresenceUsers([]);
-
-      setIssueActivities([]);
-
-      setError(socketError.message || "Unable to connect to real-time server");
+      setError(socketError.message);
     }
 
     function handleSocketError(payload: { message: string }) {
@@ -510,11 +508,9 @@ function ProjectBoardPage() {
 
       users: PresenceUser[];
     }) {
-      if (!belongsToCurrentProject(payload)) {
-        return;
+      if (belongsToCurrentProject(payload)) {
+        setPresenceUsers(payload.users);
       }
-
-      setPresenceUsers(payload.users);
     }
 
     function handleIssueActivity(payload: {
@@ -534,22 +530,22 @@ function ProjectBoardPage() {
         return;
       }
 
-      setIssueActivities((currentActivities) => {
-        const matches = (activity: IssueActivity) =>
-          activity.issueId === payload.issueId &&
-          activity.activity === payload.activity &&
-          activity.user.id === payload.user.id;
+      setIssueActivities((current) => {
+        const matches = (item: IssueActivity) =>
+          item.issueId === payload.issueId &&
+          item.activity === payload.activity &&
+          item.user.id === payload.user.id;
 
         if (!payload.active) {
-          return currentActivities.filter((activity) => !matches(activity));
+          return current.filter((item) => !matches(item));
         }
 
-        if (currentActivities.some(matches)) {
-          return currentActivities;
+        if (current.some(matches)) {
+          return current;
         }
 
         return [
-          ...currentActivities,
+          ...current,
           {
             issueId: payload.issueId,
 
@@ -572,9 +568,7 @@ function ProjectBoardPage() {
         return;
       }
 
-      setIssues((currentIssues) =>
-        addRealtimeIssue(currentIssues, payload.issue),
-      );
+      setIssues((current) => addRealtimeIssue(current, payload.issue));
 
       refreshActivitySoon();
     }
@@ -590,12 +584,10 @@ function ProjectBoardPage() {
         return;
       }
 
-      setIssues((currentIssues) =>
-        updateRealtimeIssue(currentIssues, payload.issue),
-      );
+      setIssues((current) => updateRealtimeIssue(current, payload.issue));
 
-      setDiscussionIssue((currentIssue) =>
-        currentIssue?.id === payload.issue.id ? payload.issue : currentIssue,
+      setDiscussionIssue((current) =>
+        current?.id === payload.issue.id ? payload.issue : current,
       );
 
       refreshActivitySoon();
@@ -612,13 +604,7 @@ function ProjectBoardPage() {
         return;
       }
 
-      setIssues((currentIssues) =>
-        moveRealtimeIssue(currentIssues, payload.issue),
-      );
-
-      setDiscussionIssue((currentIssue) =>
-        currentIssue?.id === payload.issue.id ? payload.issue : currentIssue,
-      );
+      setIssues((current) => moveRealtimeIssue(current, payload.issue));
 
       refreshActivitySoon();
     }
@@ -634,31 +620,15 @@ function ProjectBoardPage() {
         return;
       }
 
-      setIssues((currentIssues) =>
-        deleteRealtimeIssue(currentIssues, payload.issueId),
-      );
-
-      setIssueActivities((currentActivities) =>
-        currentActivities.filter(
-          (activity) => activity.issueId !== payload.issueId,
-        ),
-      );
-
-      setEditingIssue((currentIssue) =>
-        currentIssue?.id === payload.issueId ? null : currentIssue,
-      );
-
-      setDiscussionIssue((currentIssue) =>
-        currentIssue?.id === payload.issueId ? null : currentIssue,
-      );
+      setIssues((current) => deleteRealtimeIssue(current, payload.issueId));
 
       if (linkedIssueId === payload.issueId) {
-        setSearchParams((currentParams) => {
-          const nextParams = new URLSearchParams(currentParams);
+        setSearchParams((current) => {
+          const next = new URLSearchParams(current);
 
-          nextParams.delete("issue");
+          next.delete("issue");
 
-          return nextParams;
+          return next;
         });
       }
 
@@ -693,10 +663,6 @@ function ProjectBoardPage() {
       if (socket.connected) {
         socket.emit("project:leave", roomPayload);
       }
-
-      setPresenceUsers([]);
-
-      setIssueActivities([]);
 
       socket.off("connect", joinProjectRoom);
 
@@ -734,76 +700,35 @@ function ProjectBoardPage() {
 
     defaultValue: string,
   ) {
-    setSearchParams((currentParams) => {
-      const nextParams = new URLSearchParams(currentParams);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
 
       if (value.trim().length === 0 || value === defaultValue) {
-        nextParams.delete(key);
+        next.delete(key);
       } else {
-        nextParams.set(key, value);
+        next.set(key, value);
       }
 
-      return nextParams;
-    });
-  }
-
-  function handleSearchChange(value: string) {
-    setQueryParameter("q", value, "");
-  }
-
-  function handleStatusChange(value: StatusFilter) {
-    setQueryParameter("status", value, "ALL");
-  }
-
-  function handlePriorityChange(value: PriorityFilter) {
-    setQueryParameter("priority", value, "ALL");
-  }
-
-  function handleDueDateChange(value: DueDateFilter) {
-    setQueryParameter("due", value, "ALL");
-  }
-
-  function handleAssigneeChange(value: string) {
-    setQueryParameter("assignee", value, "ALL");
-  }
-
-  function handleSortChange(value: SortOption) {
-    setQueryParameter("sort", value, "BOARD");
-  }
-
-  function handleMyIssuesChange(value: boolean) {
-    setSearchParams((currentParams) => {
-      const nextParams = new URLSearchParams(currentParams);
-
-      if (value) {
-        nextParams.set("mine", "true");
-      } else {
-        nextParams.delete("mine");
-      }
-
-      return nextParams;
+      return next;
     });
   }
 
   function handleClearFilters() {
-    setSearchParams((currentParams) => {
-      const nextParams = new URLSearchParams(currentParams);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
 
-      nextParams.delete("q");
+      [
+        "q",
+        "status",
+        "priority",
+        "due",
+        "assignee",
+        "label",
+        "sort",
+        "mine",
+      ].forEach((key) => next.delete(key));
 
-      nextParams.delete("status");
-
-      nextParams.delete("priority");
-
-      nextParams.delete("due");
-
-      nextParams.delete("assignee");
-
-      nextParams.delete("sort");
-
-      nextParams.delete("mine");
-
-      return nextParams;
+      return next;
     });
   }
 
@@ -818,15 +743,13 @@ function ProjectBoardPage() {
 
     const socket = getSocket(accessToken);
 
-    if (!socket.connected) {
-      return;
+    if (socket.connected) {
+      socket.emit(event, {
+        workspaceId,
+        projectId,
+        issueId,
+      });
     }
-
-    socket.emit(event, {
-      workspaceId,
-      projectId,
-      issueId,
-    });
   }
 
   function emitIssueActivity(
@@ -842,23 +765,15 @@ function ProjectBoardPage() {
 
     const socket = getSocket(accessToken);
 
-    if (!socket.connected) {
-      return;
+    if (socket.connected) {
+      socket.emit("issue:activity", {
+        workspaceId,
+        projectId,
+        issueId,
+        activity,
+        active,
+      });
     }
-
-    socket.emit("issue:activity", {
-      workspaceId,
-      projectId,
-      issueId,
-      activity,
-      active,
-    });
-  }
-
-  function refreshActivitySoon() {
-    window.setTimeout(() => {
-      void loadActivity();
-    }, 300);
   }
 
   async function handleCreateIssue(input: CreateIssueInput) {
@@ -873,13 +788,13 @@ function ProjectBoardPage() {
       accessToken,
     );
 
-    setIssues((currentIssues) => addRealtimeIssue(currentIssues, newIssue));
+    setIssues((current) => addRealtimeIssue(current, newIssue));
 
     setShowCreateForm(false);
 
     emitIssueEvent("issue:created", newIssue.id);
 
-    refreshActivitySoon();
+    void loadActivity();
   }
 
   async function handleUpdateIssue(
@@ -887,16 +802,12 @@ function ProjectBoardPage() {
 
     input: UpdateIssueInput,
   ) {
-    if (!workspaceId || !projectId || !accessToken) {
+    if (!workspaceId || !projectId || !accessToken || !editingIssue) {
       throw new Error("Unable to update issue");
     }
 
-    if (!editingIssue || editingIssue.id !== issueId) {
-      throw new Error("The issue being edited is no longer available");
-    }
-
     try {
-      const updatedIssue = await updateIssue(
+      const updated = await updateIssue(
         workspaceId,
         projectId,
         issueId,
@@ -905,29 +816,17 @@ function ProjectBoardPage() {
         accessToken,
       );
 
-      setIssues((currentIssues) =>
-        updateRealtimeIssue(currentIssues, updatedIssue),
-      );
-
-      setDiscussionIssue((currentIssue) =>
-        currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
-      );
+      setIssues((current) => updateRealtimeIssue(current, updated));
 
       setEditingIssue(null);
 
-      emitIssueEvent("issue:updated", updatedIssue.id);
+      emitIssueEvent("issue:updated", updated.id);
 
-      refreshActivitySoon();
+      void loadActivity();
     } catch (updateError) {
       if (updateError instanceof IssueConflictError) {
-        const latestIssue = issues.find((issue) => issue.id === issueId);
-
-        if (latestIssue) {
-          setEditingIssue(latestIssue);
-        }
-
         throw new IssueConflictError(
-          "Another collaborator changed this issue while you were editing it. Review the latest version and save again.",
+          "Another collaborator changed this issue. Review the latest version and save again.",
         );
       }
 
@@ -948,28 +847,8 @@ function ProjectBoardPage() {
       return;
     }
 
-    const previousIssues = issues;
-
-    const existingIssue = issues.find((issue) => issue.id === issueId);
-
-    if (!existingIssue) {
-      return;
-    }
-
-    const optimisticIssue: Issue = {
-      ...existingIssue,
-      status,
-      position,
-    };
-
-    setError(null);
-
-    setIssues((currentIssues) =>
-      moveRealtimeIssue(currentIssues, optimisticIssue),
-    );
-
     try {
-      const movedIssue = await moveIssue(
+      const moved = await moveIssue(
         workspaceId,
         projectId,
         issueId,
@@ -980,20 +859,10 @@ function ProjectBoardPage() {
         accessToken,
       );
 
-      setIssues((currentIssues) =>
-        moveRealtimeIssue(currentIssues, movedIssue),
-      );
+      setIssues((current) => moveRealtimeIssue(current, moved));
 
-      setDiscussionIssue((currentIssue) =>
-        currentIssue?.id === movedIssue.id ? movedIssue : currentIssue,
-      );
-
-      emitIssueEvent("issue:moved", movedIssue.id);
-
-      refreshActivitySoon();
+      emitIssueEvent("issue:moved", moved.id);
     } catch (moveError) {
-      setIssues(previousIssues);
-
       setError(
         moveError instanceof Error ? moveError.message : "Unable to move issue",
       );
@@ -1005,159 +874,56 @@ function ProjectBoardPage() {
       return;
     }
 
-    const issueId = deletingIssue.id;
-
     try {
       setDeleting(true);
 
-      setError(null);
+      await deleteIssue(workspaceId, projectId, deletingIssue.id, accessToken);
 
-      await deleteIssue(workspaceId, projectId, issueId, accessToken);
+      setIssues((current) => deleteRealtimeIssue(current, deletingIssue.id));
 
-      setIssues((currentIssues) => deleteRealtimeIssue(currentIssues, issueId));
-
-      setIssueActivities((currentActivities) =>
-        currentActivities.filter((activity) => activity.issueId !== issueId),
-      );
-
-      if (discussionIssue?.id === issueId) {
-        setDiscussionIssue(null);
-
-        setSearchParams((currentParams) => {
-          const nextParams = new URLSearchParams(currentParams);
-
-          nextParams.delete("issue");
-
-          return nextParams;
-        });
-      }
-
-      if (editingIssue?.id === issueId) {
-        emitIssueActivity(issueId, "EDITING", false);
-
-        setEditingIssue(null);
-      }
+      emitIssueEvent("issue:deleted", deletingIssue.id);
 
       setDeletingIssue(null);
-
-      emitIssueEvent("issue:deleted", issueId);
-
-      refreshActivitySoon();
-    } catch (deleteError) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Unable to delete issue",
-      );
     } finally {
       setDeleting(false);
     }
   }
 
-  function handleStartCreate() {
-    if (editingIssue) {
-      emitIssueActivity(editingIssue.id, "EDITING", false);
-    }
-
-    setEditingIssue(null);
-
-    setDeletingIssue(null);
-
-    setShowCreateForm(true);
-
-    setError(null);
-  }
-
-  function handleStartEdit(issue: Issue) {
-    if (editingIssue && editingIssue.id !== issue.id) {
-      emitIssueActivity(editingIssue.id, "EDITING", false);
-    }
-
-    setShowCreateForm(false);
-
-    setDeletingIssue(null);
-
-    setEditingIssue(issue);
-
-    setError(null);
-
-    emitIssueActivity(issue.id, "EDITING", true);
-  }
-
-  function handleCancelEdit() {
-    if (editingIssue) {
-      emitIssueActivity(editingIssue.id, "EDITING", false);
-    }
-
-    setEditingIssue(null);
-  }
-
-  function handleStartDelete(issue: Issue) {
-    if (editingIssue) {
-      emitIssueActivity(editingIssue.id, "EDITING", false);
-    }
-
-    setShowCreateForm(false);
-
-    setEditingIssue(null);
-
-    setDeletingIssue(issue);
-
-    setError(null);
-  }
-
   function handleOpenComments(issue: Issue) {
     setDiscussionIssue(issue);
 
-    setSearchParams((currentParams) => {
-      const nextParams = new URLSearchParams(currentParams);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
 
-      nextParams.set("issue", issue.id);
+      next.set("issue", issue.id);
 
-      return nextParams;
+      return next;
     });
-
-    setError(null);
   }
 
   function handleCloseComments() {
     setDiscussionIssue(null);
 
-    setSearchParams((currentParams) => {
-      const nextParams = new URLSearchParams(currentParams);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
 
-      nextParams.delete("issue");
+      next.delete("issue");
 
-      return nextParams;
+      return next;
     });
-  }
-
-  function handleDragActivity(
-    issueId: string,
-
-    active: boolean,
-  ) {
-    emitIssueActivity(issueId, "DRAGGING", active);
   }
 
   const currentMembership = user
     ? members.find((member) => member.user.id === user.id)
     : undefined;
 
+  const canManageLabels =
+    currentMembership?.role === "OWNER" || currentMembership?.role === "ADMIN";
+
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 p-8">
-        <p className="text-slate-300">Loading board...</p>
-      </main>
-    );
-  }
-
-  if (error && issues.length === 0) {
-    return (
-      <main className="min-h-screen bg-slate-950 p-8">
-        <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300">
-          {error}
-        </div>
+      <main className="min-h-screen bg-slate-950 p-8 text-slate-300">
+        Loading board...
       </main>
     );
   }
@@ -1166,36 +932,19 @@ function ProjectBoardPage() {
     <main className="min-h-screen bg-slate-950 px-6 py-8">
       <div className="mx-auto max-w-7xl">
         <header className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-5">
             <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
+              <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
                 {workspace?.name ?? "Workspace"}
               </p>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-bold text-white">
-                  {project?.name ?? "Kanban Board"}
-                </h1>
+              <h1 className="mt-2 text-3xl font-bold text-white">
+                {project?.name ?? "Project Board"}
+              </h1>
 
-                {project && (
-                  <span
-                    className={`
-                      rounded-full border px-3 py-1 text-xs font-semibold
-                      ${
-                        project.status === "ACTIVE"
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                          : "border-slate-600 bg-slate-800 text-slate-400"
-                      }
-                    `}
-                  >
-                    {project.status}
-                  </span>
-                )}
-              </div>
-
-              <p className="mt-2 max-w-2xl text-slate-400">
+              <p className="mt-2 text-slate-400">
                 {project?.description ??
-                  "Track issues across your project workflow."}
+                  "Track and collaborate on project issues."}
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-4">
@@ -1227,9 +976,9 @@ function ProjectBoardPage() {
 
             <button
               type="button"
-              onClick={handleStartCreate}
+              onClick={() => setShowCreateForm(true)}
               disabled={project?.status === "ARCHIVED"}
-              className="self-start rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40 sm:self-auto"
+              className="rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
             >
               New Issue
             </button>
@@ -1237,17 +986,35 @@ function ProjectBoardPage() {
         </header>
 
         {error && (
-          <div className="mb-6 rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300">
+          <div className="mb-6 rounded-lg border border-red-900 bg-red-950/40 p-3 text-red-300">
             {error}
           </div>
         )}
 
         <BoardStats issues={issues} />
 
+        {workspaceId && projectId && accessToken && (
+          <LabelManager
+            workspaceId={workspaceId}
+            projectId={projectId}
+            accessToken={accessToken}
+            labels={labels}
+            canManage={canManageLabels}
+            onCreated={(label) =>
+              setLabels((current) =>
+                [...current, label].sort((first, second) =>
+                  first.name.localeCompare(second.name),
+                ),
+              )
+            }
+          />
+        )}
+
         {showCreateForm && (
           <div className="mb-6">
             <CreateIssueForm
               members={members}
+              labels={labels}
               onCreate={handleCreateIssue}
               onCancel={() => setShowCreateForm(false)}
             />
@@ -1260,49 +1027,14 @@ function ProjectBoardPage() {
               key={`${editingIssue.id}-${editingIssue.updatedAt}`}
               issue={editingIssue}
               members={members}
+              labels={labels}
               onSave={handleUpdateIssue}
-              onCancel={handleCancelEdit}
+              onCancel={() => {
+                emitIssueActivity(editingIssue.id, "EDITING", false);
+
+                setEditingIssue(null);
+              }}
             />
-          </div>
-        )}
-
-        {deletingIssue && (
-          <div className="mb-6 rounded-2xl border border-red-900 bg-red-950/30 p-5">
-            <h2 className="text-lg font-semibold text-white">Delete Issue</h2>
-
-            <p className="mt-2 text-sm text-slate-300">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-white">
-                {deletingIssue.title}
-              </span>
-              ?
-            </p>
-
-            <p className="mt-1 text-sm text-red-300">
-              This action cannot be undone.
-            </p>
-
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingIssue(null)}
-                disabled={deleting}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  void handleDeleteIssue();
-                }}
-                disabled={deleting}
-                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-400 disabled:opacity-50"
-              >
-                {deleting ? "Deleting..." : "Delete Issue"}
-              </button>
-            </div>
           </div>
         )}
 
@@ -1324,18 +1056,27 @@ function ProjectBoardPage() {
           priorityFilter={priorityFilter}
           dueDateFilter={dueDateFilter}
           assigneeFilter={assigneeFilter}
+          labelFilter={labelFilter}
           sortOption={sortOption}
           myIssuesOnly={myIssuesOnly}
           members={members}
+          labels={labels}
           filteredCount={filteredIssues.length}
           totalCount={issues.length}
-          onSearchChange={handleSearchChange}
-          onStatusChange={handleStatusChange}
-          onPriorityChange={handlePriorityChange}
-          onDueDateChange={handleDueDateChange}
-          onAssigneeChange={handleAssigneeChange}
-          onSortChange={handleSortChange}
-          onMyIssuesChange={handleMyIssuesChange}
+          onSearchChange={(value) => setQueryParameter("q", value, "")}
+          onStatusChange={(value) => setQueryParameter("status", value, "ALL")}
+          onPriorityChange={(value) =>
+            setQueryParameter("priority", value, "ALL")
+          }
+          onDueDateChange={(value) => setQueryParameter("due", value, "ALL")}
+          onAssigneeChange={(value) =>
+            setQueryParameter("assignee", value, "ALL")
+          }
+          onLabelChange={(value) => setQueryParameter("label", value, "ALL")}
+          onSortChange={(value) => setQueryParameter("sort", value, "BOARD")}
+          onMyIssuesChange={(value) =>
+            setQueryParameter("mine", value ? "true" : "", "")
+          }
           onClear={handleClearFilters}
         />
 
@@ -1350,9 +1091,15 @@ function ProjectBoardPage() {
             activities={issueActivities}
             onMoveIssue={handleMoveIssue}
             onCommentsIssue={handleOpenComments}
-            onEditIssue={handleStartEdit}
-            onDeleteIssue={handleStartDelete}
-            onDragActivity={handleDragActivity}
+            onEditIssue={(issue) => {
+              setEditingIssue(issue);
+
+              emitIssueActivity(issue.id, "EDITING", true);
+            }}
+            onDeleteIssue={setDeletingIssue}
+            onDragActivity={(issueId, active) =>
+              emitIssueActivity(issueId, "DRAGGING", active)
+            }
           />
 
           <ActivityTimeline
@@ -1361,6 +1108,43 @@ function ProjectBoardPage() {
             onRefresh={loadActivity}
           />
         </div>
+
+        {deletingIssue && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+            <div className="w-full max-w-md rounded-2xl border border-red-900 bg-slate-900 p-6">
+              <h2 className="text-xl font-semibold text-white">Delete Issue</h2>
+
+              <p className="mt-3 text-slate-400">
+                Delete{" "}
+                <span className="font-semibold text-white">
+                  {deletingIssue.title}
+                </span>
+                ?
+              </p>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeletingIssue(null)}
+                  className="rounded-lg border border-slate-700 px-4 py-2 text-slate-300"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => {
+                    void handleDeleteIssue();
+                  }}
+                  className="rounded-lg bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-50"
+                >
+                  {deleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
