@@ -8,13 +8,13 @@ import type { WorkspaceMember } from "../../api/workspaces";
 
 interface CreateIssueFormProps {
   members: WorkspaceMember[];
-
   labels: Label[];
-
   onCreate: (input: CreateIssueInput) => Promise<void>;
-
   onCancel: () => void;
 }
+
+const controlClasses =
+  "w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-200 outline-none transition placeholder:text-slate-700 focus:border-cyan-500/60";
 
 function CreateIssueForm({
   members,
@@ -89,188 +89,189 @@ function CreateIssueForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5"
+      className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/45"
     >
-      <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
-            Issue
+          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-400">
+            New issue
           </p>
 
-          <h2 className="mt-1 text-xl font-semibold text-white">
-            Create Issue
+          <h2 className="mt-0.5 text-sm font-semibold text-slate-100">
+            Create issue
           </h2>
         </div>
 
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+          className="rounded-md px-2 py-1.5 text-[10px] font-medium text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
         >
-          Cancel
+          Close
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">
-          {error}
-        </div>
-      )}
+      <div className="p-4">
+        {error && (
+          <div className="mb-3 rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2 text-[11px] text-rose-300">
+            {error}
+          </div>
+        )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="lg:col-span-2">
-          <label
-            htmlFor="create-issue-title"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Title
-          </label>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="lg:col-span-2">
+            <label
+              htmlFor="create-issue-title"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Title
+            </label>
 
-          <input
-            id="create-issue-title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            maxLength={200}
-            placeholder="Implement authentication flow"
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          />
-        </div>
+            <input
+              id="create-issue-title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={200}
+              placeholder="Implement authentication flow"
+              className={controlClasses}
+            />
+          </div>
 
-        <div className="lg:col-span-2">
-          <label
-            htmlFor="create-issue-description"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Description
-          </label>
+          <div className="lg:col-span-2">
+            <label
+              htmlFor="create-issue-description"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Description
+            </label>
 
-          <textarea
-            id="create-issue-description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            rows={4}
-            maxLength={5000}
-            placeholder="Describe the work..."
-            className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          />
-        </div>
+            <textarea
+              id="create-issue-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+              maxLength={5000}
+              placeholder="Describe the work..."
+              className={`${controlClasses} resize-y`}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="create-issue-priority"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Priority
-          </label>
+          <div>
+            <label
+              htmlFor="create-issue-priority"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Priority
+            </label>
 
-          <select
-            id="create-issue-priority"
-            value={priority}
-            onChange={(event) =>
-              setPriority(event.target.value as IssuePriority)
-            }
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          >
-            <option value="LOW">Low</option>
+            <select
+              id="create-issue-priority"
+              value={priority}
+              onChange={(event) =>
+                setPriority(event.target.value as IssuePriority)
+              }
+              className={controlClasses}
+            >
+              <option value="LOW">Low</option>
 
-            <option value="MEDIUM">Medium</option>
+              <option value="MEDIUM">Medium</option>
 
-            <option value="HIGH">High</option>
+              <option value="HIGH">High</option>
 
-            <option value="URGENT">Urgent</option>
-          </select>
-        </div>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
 
-        <div>
-          <label
-            htmlFor="create-issue-assignee"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Assignee
-          </label>
+          <div>
+            <label
+              htmlFor="create-issue-assignee"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Assignee
+            </label>
 
-          <select
-            id="create-issue-assignee"
-            value={assigneeId}
-            onChange={(event) => setAssigneeId(event.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          >
-            <option value="">Unassigned</option>
+            <select
+              id="create-issue-assignee"
+              value={assigneeId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+              className={controlClasses}
+            >
+              <option value="">Unassigned</option>
 
-            {members.map((member) => (
-              <option key={member.user.id} value={member.user.id}>
-                {member.user.name}
-              </option>
-            ))}
-          </select>
-        </div>
+              {members.map((member) => (
+                <option key={member.user.id} value={member.user.id}>
+                  {member.user.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label
-            htmlFor="create-issue-due-date"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Due Date
-          </label>
+          <div>
+            <label
+              htmlFor="create-issue-due-date"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Due date
+            </label>
 
-          <input
-            id="create-issue-due-date"
-            type="date"
-            value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          />
-        </div>
+            <input
+              id="create-issue-due-date"
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+              className={controlClasses}
+            />
+          </div>
 
-        <div className="lg:col-span-2">
-          <p className="mb-3 block text-sm font-medium text-slate-300">
-            Labels
-          </p>
-
-          {labels.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No project labels have been created yet.
+          <div className="lg:col-span-2">
+            <p className="mb-2 text-[10px] font-medium text-slate-500">
+              Labels
             </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {labels.map((label) => {
-                const selected = selectedLabelIds.includes(label.id);
 
-                return (
-                  <label
-                    key={label.id}
-                    className={`
-                        flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition
-                        ${selected ? "bg-slate-800" : "bg-slate-950"}
-                      `}
-                    style={{
-                      borderColor: label.color,
+            {labels.length === 0 ? (
+              <p className="text-[10px] text-slate-700">
+                No project labels yet.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {labels.map((label) => {
+                  const selected = selectedLabelIds.includes(label.id);
 
-                      color: label.color,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => toggleLabel(label.id)}
-                      className="h-3.5 w-3.5"
-                    />
+                  return (
+                    <label
+                      key={label.id}
+                      className="cursor-pointer rounded-md px-2 py-1 text-[10px] font-medium transition"
+                      style={{
+                        color: label.color,
 
-                    {label.name}
-                  </label>
-                );
-              })}
-            </div>
-          )}
+                        backgroundColor: selected
+                          ? `${label.color}20`
+                          : `${label.color}0d`,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleLabel(label.id)}
+                        className="sr-only"
+                      />
+
+                      {label.name}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end gap-3">
+      <div className="flex justify-end gap-2 border-t border-slate-800 px-4 py-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md border border-slate-800 px-3 py-2 text-[10px] font-medium text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
         >
           Cancel
         </button>
@@ -278,9 +279,9 @@ function CreateIssueForm({
         <button
           type="submit"
           disabled={submitting || title.trim().length === 0}
-          className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-40"
+          className="rounded-md bg-cyan-400 px-3 py-2 text-[10px] font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {submitting ? "Creating..." : "Create Issue"}
+          {submitting ? "Creating..." : "Create issue"}
         </button>
       </div>
     </form>

@@ -8,19 +8,16 @@ import type { WorkspaceMember } from "../../api/workspaces";
 
 interface EditIssueFormProps {
   issue: Issue;
-
   members: WorkspaceMember[];
-
   labels: Label[];
 
-  onSave: (
-    issueId: string,
-
-    input: UpdateIssueInput,
-  ) => Promise<void>;
+  onSave: (issueId: string, input: UpdateIssueInput) => Promise<void>;
 
   onCancel: () => void;
 }
+
+const controlClasses =
+  "w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-cyan-500/60";
 
 function getDateInputValue(value: string | null) {
   if (!value) {
@@ -106,194 +103,199 @@ function EditIssueForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-cyan-500/30 bg-slate-900/70 p-5"
+      className="overflow-hidden rounded-xl border border-violet-500/20 bg-slate-900/45"
     >
-      <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
-            Issue
+          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-violet-400">
+            Edit issue
           </p>
 
-          <h2 className="mt-1 text-xl font-semibold text-white">Edit Issue</h2>
+          <h2 className="mt-0.5 max-w-xl truncate text-sm font-semibold text-slate-100">
+            {issue.title}
+          </h2>
         </div>
 
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+          className="rounded-md px-2 py-1.5 text-[10px] font-medium text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
         >
-          Cancel
+          Close
         </button>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">
-          {error}
-        </div>
-      )}
+      <div className="p-4">
+        {error && (
+          <div className="mb-3 rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2 text-[11px] text-rose-300">
+            {error}
+          </div>
+        )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="lg:col-span-2">
-          <label
-            htmlFor="edit-issue-title"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Title
-          </label>
-
-          <input
-            id="edit-issue-title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            maxLength={200}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          />
-        </div>
-
-        <div className="lg:col-span-2">
-          <label
-            htmlFor="edit-issue-description"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Description
-          </label>
-
-          <textarea
-            id="edit-issue-description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            rows={4}
-            maxLength={5000}
-            className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="edit-issue-priority"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Priority
-          </label>
-
-          <select
-            id="edit-issue-priority"
-            value={priority}
-            onChange={(event) =>
-              setPriority(event.target.value as IssuePriority)
-            }
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          >
-            <option value="LOW">Low</option>
-
-            <option value="MEDIUM">Medium</option>
-
-            <option value="HIGH">High</option>
-
-            <option value="URGENT">Urgent</option>
-          </select>
-        </div>
-
-        <div>
-          <label
-            htmlFor="edit-issue-assignee"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Assignee
-          </label>
-
-          <select
-            id="edit-issue-assignee"
-            value={assigneeId}
-            onChange={(event) => setAssigneeId(event.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          >
-            <option value="">Unassigned</option>
-
-            {members.map((member) => (
-              <option key={member.user.id} value={member.user.id}>
-                {member.user.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label
-            htmlFor="edit-issue-due-date"
-            className="mb-2 block text-sm font-medium text-slate-300"
-          >
-            Due Date
-          </label>
-
-          <input
-            id="edit-issue-due-date"
-            type="date"
-            value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none focus:border-cyan-500"
-          />
-
-          {dueDate && (
-            <button
-              type="button"
-              onClick={() => setDueDate("")}
-              className="mt-2 text-xs text-slate-500 hover:text-red-300"
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="lg:col-span-2">
+            <label
+              htmlFor="edit-issue-title"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
             >
-              Remove due date
-            </button>
-          )}
-        </div>
+              Title
+            </label>
 
-        <div className="lg:col-span-2">
-          <p className="mb-3 block text-sm font-medium text-slate-300">
-            Labels
-          </p>
+            <input
+              id="edit-issue-title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={200}
+              className={controlClasses}
+            />
+          </div>
 
-          {labels.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No project labels have been created yet.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {labels.map((label) => {
-                const selected = selectedLabelIds.includes(label.id);
+          <div className="lg:col-span-2">
+            <label
+              htmlFor="edit-issue-description"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Description
+            </label>
 
-                return (
-                  <label
-                    key={label.id}
-                    className={`
-                        flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition
-                        ${selected ? "bg-slate-800" : "bg-slate-950"}
-                      `}
-                    style={{
-                      borderColor: label.color,
+            <textarea
+              id="edit-issue-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+              maxLength={5000}
+              className={`${controlClasses} resize-y`}
+            />
+          </div>
 
-                      color: label.color,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => toggleLabel(label.id)}
-                      className="h-3.5 w-3.5"
-                    />
+          <div>
+            <label
+              htmlFor="edit-issue-priority"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Priority
+            </label>
 
-                    {label.name}
-                  </label>
-                );
-              })}
+            <select
+              id="edit-issue-priority"
+              value={priority}
+              onChange={(event) =>
+                setPriority(event.target.value as IssuePriority)
+              }
+              className={controlClasses}
+            >
+              <option value="LOW">Low</option>
+
+              <option value="MEDIUM">Medium</option>
+
+              <option value="HIGH">High</option>
+
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="edit-issue-assignee"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Assignee
+            </label>
+
+            <select
+              id="edit-issue-assignee"
+              value={assigneeId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+              className={controlClasses}
+            >
+              <option value="">Unassigned</option>
+
+              {members.map((member) => (
+                <option key={member.user.id} value={member.user.id}>
+                  {member.user.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="edit-issue-due-date"
+              className="mb-1.5 block text-[10px] font-medium text-slate-500"
+            >
+              Due date
+            </label>
+
+            <div className="flex gap-2">
+              <input
+                id="edit-issue-due-date"
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className={controlClasses}
+              />
+
+              {dueDate && (
+                <button
+                  type="button"
+                  onClick={() => setDueDate("")}
+                  className="shrink-0 rounded-lg border border-slate-800 px-2.5 text-[10px] text-slate-500 transition hover:border-rose-900/50 hover:text-rose-300"
+                >
+                  Clear
+                </button>
+              )}
             </div>
-          )}
+          </div>
+
+          <div className="lg:col-span-2">
+            <p className="mb-2 text-[10px] font-medium text-slate-500">
+              Labels
+            </p>
+
+            {labels.length === 0 ? (
+              <p className="text-[10px] text-slate-700">
+                No project labels yet.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {labels.map((label) => {
+                  const selected = selectedLabelIds.includes(label.id);
+
+                  return (
+                    <label
+                      key={label.id}
+                      className="cursor-pointer rounded-md px-2 py-1 text-[10px] font-medium transition"
+                      style={{
+                        color: label.color,
+
+                        backgroundColor: selected
+                          ? `${label.color}20`
+                          : `${label.color}0d`,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleLabel(label.id)}
+                        className="sr-only"
+                      />
+
+                      {label.name}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end gap-3">
+      <div className="flex justify-end gap-2 border-t border-slate-800 px-4 py-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md border border-slate-800 px-3 py-2 text-[10px] font-medium text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
         >
           Cancel
         </button>
@@ -301,9 +303,9 @@ function EditIssueForm({
         <button
           type="submit"
           disabled={submitting || title.trim().length === 0}
-          className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-40"
+          className="rounded-md bg-violet-500 px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {submitting ? "Saving..." : "Save Changes"}
+          {submitting ? "Saving..." : "Save changes"}
         </button>
       </div>
     </form>

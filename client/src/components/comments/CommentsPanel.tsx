@@ -21,11 +21,8 @@ interface CommentsPanelProps {
   projectId: string;
   issue: Issue;
   accessToken: string;
-
   currentUserId: string | null;
-
   currentUserRole: WorkspaceRole | null;
-
   onClose: () => void;
 }
 
@@ -42,11 +39,8 @@ function getInitials(name: string) {
 function formatDate(date: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
-
     day: "numeric",
-
     hour: "numeric",
-
     minute: "2-digit",
   }).format(new Date(date));
 }
@@ -156,9 +150,7 @@ function CommentsPanel({
 
     function belongsToDiscussion(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
     }) {
       return (
@@ -170,11 +162,8 @@ function CommentsPanel({
 
     function handleCommentCreated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
-
       comment: IssueComment;
     }) {
       if (!belongsToDiscussion(payload)) {
@@ -196,11 +185,8 @@ function CommentsPanel({
 
     function handleCommentUpdated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
-
       comment: IssueComment;
     }) {
       if (!belongsToDiscussion(payload)) {
@@ -216,11 +202,8 @@ function CommentsPanel({
 
     function handleCommentDeleted(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
-
       commentId: string;
     }) {
       if (!belongsToDiscussion(payload)) {
@@ -249,7 +232,6 @@ function CommentsPanel({
 
   function emitCommentMutation(
     event: "comment:created" | "comment:updated" | "comment:deleted",
-
     commentId: string,
   ) {
     const socket = getSocket(accessToken);
@@ -262,7 +244,6 @@ function CommentsPanel({
       workspaceId,
       projectId,
       issueId: issue.id,
-
       commentId,
     });
   }
@@ -468,18 +449,18 @@ function CommentsPanel({
   }
 
   return (
-    <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/70">
-      <header className="flex items-start justify-between gap-4 border-b border-slate-800 p-5">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
+    <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/45">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-800 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-400">
             Discussion
           </p>
 
-          <h2 className="mt-1 text-xl font-semibold text-white">
+          <h2 className="mt-0.5 truncate text-sm font-semibold text-slate-100">
             {issue.title}
           </h2>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-1 text-[10px] text-slate-600">
             {comments.length} {comments.length === 1 ? "comment" : "comments"}
           </p>
         </div>
@@ -487,28 +468,30 @@ function CommentsPanel({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+          className="rounded-md px-2 py-1.5 text-[10px] font-medium text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
         >
           Close
         </button>
       </header>
 
-      <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div>
           {error && (
-            <div className="mb-4 rounded-xl border border-red-900 bg-red-950/30 p-3 text-sm text-red-300">
+            <div className="mb-3 rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2 text-[11px] text-rose-300">
               {error}
             </div>
           )}
 
           {loading ? (
-            <p className="text-sm text-slate-500">Loading comments...</p>
-          ) : comments.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-500">
-              No comments yet.
+            <p className="py-6 text-center text-[11px] text-slate-600">
+              Loading comments...
             </p>
+          ) : comments.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-800 py-8 text-center">
+              <p className="text-[11px] text-slate-600">No comments yet</p>
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {comments.map((comment) => {
                 const isAuthor = currentUserId === comment.authorId;
 
@@ -522,32 +505,32 @@ function CommentsPanel({
                 return (
                   <article
                     key={comment.id}
-                    className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+                    className="rounded-lg border border-slate-800 bg-slate-950/35 p-3"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-300">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-cyan-500/10 text-[9px] font-semibold text-cyan-300">
                           {getInitials(comment.author.name)}
                         </div>
 
-                        <div>
-                          <p className="text-sm font-semibold text-white">
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-medium text-slate-300">
                             {comment.author.name}
                           </p>
 
-                          <time className="text-xs text-slate-500">
+                          <time className="text-[9px] text-slate-700">
                             {formatDate(comment.createdAt)}
                           </time>
                         </div>
                       </div>
 
                       {!isEditing && (
-                        <div className="flex gap-3">
+                        <div className="flex shrink-0 gap-2">
                           {isAuthor && (
                             <button
                               type="button"
                               onClick={() => handleStartEdit(comment)}
-                              className="text-xs text-cyan-400"
+                              className="text-[9px] font-medium text-cyan-500 transition hover:text-cyan-300"
                             >
                               Edit
                             </button>
@@ -560,7 +543,7 @@ function CommentsPanel({
                               onClick={() => {
                                 void handleDelete(comment);
                               }}
-                              className="text-xs text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="text-[9px] font-medium text-rose-500 transition hover:text-rose-300 disabled:opacity-50"
                             >
                               {deletingId === comment.id
                                 ? "Deleting..."
@@ -572,21 +555,21 @@ function CommentsPanel({
                     </div>
 
                     {isEditing ? (
-                      <div className="mt-4">
+                      <div className="mt-3">
                         <textarea
                           value={editingBody}
                           onChange={(event) =>
                             setEditingBody(event.target.value)
                           }
-                          rows={5}
-                          className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3 text-sm text-white"
+                          rows={4}
+                          className="w-full resize-y rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-none focus:border-cyan-500/60"
                         />
 
-                        <div className="mt-3 flex justify-end gap-2">
+                        <div className="mt-2 flex justify-end gap-2">
                           <button
                             type="button"
                             onClick={handleCancelEdit}
-                            className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300"
+                            className="rounded-md border border-slate-800 px-2.5 py-1.5 text-[9px] text-slate-500 hover:text-slate-300"
                           >
                             Cancel
                           </button>
@@ -597,14 +580,14 @@ function CommentsPanel({
                               void handleSaveEdit(comment);
                             }}
                             disabled={savingEdit}
-                            className="rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950"
+                            className="rounded-md bg-cyan-400 px-2.5 py-1.5 text-[9px] font-semibold text-slate-950 disabled:opacity-50"
                           >
-                            Save
+                            {savingEdit ? "Saving..." : "Save"}
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-300">
+                      <p className="mt-3 whitespace-pre-wrap text-[11px] leading-5 text-slate-400">
                         {comment.body}
                       </p>
                     )}
@@ -617,11 +600,11 @@ function CommentsPanel({
 
         <form
           onSubmit={handleSubmit}
-          className="relative h-fit rounded-xl border border-slate-800 bg-slate-950/50 p-4"
+          className="relative h-fit rounded-lg border border-slate-800 bg-slate-950/35 p-3"
         >
           <label
             htmlFor="comment-body"
-            className="text-sm font-semibold text-white"
+            className="text-[10px] font-medium text-slate-400"
           >
             Add comment
           </label>
@@ -630,31 +613,31 @@ function CommentsPanel({
             id="comment-body"
             value={body}
             onChange={(event) => handleBodyChange(event.target.value)}
-            rows={6}
+            rows={5}
             maxLength={5000}
             placeholder="Write @ to mention a teammate..."
-            className="mt-3 w-full resize-y rounded-lg border border-slate-700 bg-slate-900 p-3 text-sm text-white outline-none focus:border-cyan-500"
+            className="mt-2 w-full resize-y rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-none placeholder:text-slate-700 focus:border-cyan-500/60"
           />
 
           {mentionQuery !== null && mentionCandidates.length > 0 && (
-            <div className="absolute left-4 right-4 z-20 mt-1 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-xl">
+            <div className="absolute left-3 right-3 z-20 mt-1 overflow-hidden rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
               {mentionCandidates.map((member) => (
                 <button
                   key={member.user.id}
                   type="button"
                   onClick={() => handleSelectMention(member)}
-                  className="flex w-full items-center gap-3 border-b border-slate-800 px-4 py-3 text-left last:border-b-0 hover:bg-slate-800"
+                  className="flex w-full items-center gap-2 border-b border-slate-800 px-3 py-2 text-left transition last:border-b-0 hover:bg-slate-800"
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/15 text-xs font-semibold text-cyan-300">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-500/10 text-[8px] font-semibold text-violet-300">
                     {getInitials(member.user.name)}
                   </div>
 
-                  <div>
-                    <p className="text-sm font-medium text-white">
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] font-medium text-slate-300">
                       {member.user.name}
                     </p>
 
-                    <p className="text-xs text-slate-500">
+                    <p className="truncate text-[8px] text-slate-600">
                       {member.user.email}
                     </p>
                   </div>
@@ -663,7 +646,7 @@ function CommentsPanel({
             </div>
           )}
 
-          <div className="mt-2 flex justify-between text-xs text-slate-500">
+          <div className="mt-1.5 flex justify-between text-[8px] text-slate-700">
             <span>
               {body.length}
               /5000
@@ -675,9 +658,9 @@ function CommentsPanel({
           <button
             type="submit"
             disabled={submitting || body.trim().length === 0}
-            className="mt-4 w-full rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-40"
+            className="mt-3 w-full rounded-md bg-cyan-400 px-3 py-2 text-[10px] font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Posting..." : "Post Comment"}
+            {submitting ? "Posting..." : "Post comment"}
           </button>
         </form>
       </div>
