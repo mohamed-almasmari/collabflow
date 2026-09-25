@@ -8,6 +8,7 @@ import { prisma } from "../config/database.js";
 
 interface ProjectRoomPayload {
   workspaceId: string;
+
   projectId: string;
 }
 
@@ -23,18 +24,23 @@ type IssueActivityType = "EDITING" | "DRAGGING";
 
 interface IssueActivityInput extends IssueMutationPayload {
   activity: IssueActivityType;
+
   active: boolean;
 }
 
 interface RealtimeUser {
   id: string;
+
   name: string;
+
   email: string;
 }
 
 interface RealtimeIssue {
   id: string;
+
   title: string;
+
   description: string | null;
 
   status: "TODO" | "IN_PROGRESS" | "DONE";
@@ -44,22 +50,31 @@ interface RealtimeIssue {
   position: number;
 
   projectId: string;
+
   createdById: string;
+
   assigneeId: string | null;
 
   createdAt: string;
+
   updatedAt: string;
 
   createdBy: RealtimeUser;
+
   assignee: RealtimeUser | null;
 }
 
 interface RealtimeComment {
   id: string;
+
   body: string;
+
   issueId: string;
+
   authorId: string;
+
   createdAt: string;
+
   updatedAt: string;
 
   author: RealtimeUser;
@@ -71,10 +86,13 @@ interface RealtimeNotification {
   type: "COMMENT_MENTION" | "ISSUE_ASSIGNED";
 
   recipientId: string;
+
   actorId: string;
 
   workspaceId: string;
+
   projectId: string;
+
   issueId: string;
 
   commentId: string | null;
@@ -87,21 +105,25 @@ interface RealtimeNotification {
 
   workspace: {
     id: string;
+
     name: string;
   };
 
   project: {
     id: string;
+
     name: string;
   };
 
   issue: {
     id: string;
+
     title: string;
   };
 
   comment: {
     id: string;
+
     body: string;
   } | null;
 }
@@ -116,17 +138,21 @@ interface IssueDeletedPayload extends ProjectRoomPayload {
 
 interface CommentRealtimePayload extends ProjectRoomPayload {
   issueId: string;
+
   comment: RealtimeComment;
 }
 
 interface CommentDeletedPayload extends ProjectRoomPayload {
   issueId: string;
+
   commentId: string;
 }
 
 interface PresenceUser {
   id: string;
+
   name: string;
+
   email: string;
 }
 
@@ -136,8 +162,11 @@ interface PresencePayload extends ProjectRoomPayload {
 
 interface IssueActivityPayload extends ProjectRoomPayload {
   issueId: string;
+
   activity: IssueActivityType;
+
   active: boolean;
+
   user: PresenceUser;
 }
 
@@ -147,6 +176,7 @@ interface SocketErrorPayload {
 
 interface ActiveSocketActivity extends ProjectRoomPayload {
   issueId: string;
+
   activity: IssueActivityType;
 }
 
@@ -198,7 +228,9 @@ interface ClientToServerEvents {
 
 interface SocketData {
   userId: string;
+
   name: string;
+
   email: string;
 
   joinedProjects: ProjectRoomPayload[];
@@ -540,6 +572,104 @@ async function getMentionNotifications(commentId: string) {
   );
 }
 
+async function getAssignmentNotification(
+  issueId: string,
+  recipientId: string,
+  minimumCreatedAt: Date,
+): Promise<RealtimeNotification | null> {
+  const notification = await prisma.notification.findFirst({
+    where: {
+      type: "ISSUE_ASSIGNED",
+
+      issueId,
+
+      recipientId,
+
+      createdAt: {
+        gte: minimumCreatedAt,
+      },
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+
+    include: {
+      actor: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+
+      workspace: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+
+      issue: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+
+      comment: {
+        select: {
+          id: true,
+          body: true,
+        },
+      },
+    },
+  });
+
+  if (!notification) {
+    return null;
+  }
+
+  return {
+    id: notification.id,
+
+    type: notification.type,
+
+    recipientId: notification.recipientId,
+
+    actorId: notification.actorId,
+
+    workspaceId: notification.workspaceId,
+
+    projectId: notification.projectId,
+
+    issueId: notification.issueId,
+
+    commentId: notification.commentId,
+
+    readAt: notification.readAt?.toISOString() ?? null,
+
+    createdAt: notification.createdAt.toISOString(),
+
+    actor: notification.actor,
+
+    workspace: notification.workspace,
+
+    project: notification.project,
+
+    issue: notification.issue,
+
+    comment: notification.comment,
+  };
+}
+
 function isAuthorizedRoom(
   socket: CollabFlowSocket,
   workspaceId: string,
@@ -584,6 +714,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
         id: userId,
 
         name,
+
         email,
       });
     }
@@ -594,16 +725,14 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
     io.to(room).emit("presence:updated", {
       workspaceId,
+
       projectId,
+
       users,
     });
   }
 
-  function emitActivity(
-    socket: CollabFlowSocket,
-
-    payload: IssueActivityInput,
-  ) {
+  function emitActivity(socket: CollabFlowSocket, payload: IssueActivityInput) {
     const room = getProjectRoom(payload.workspaceId, payload.projectId);
 
     socket.to(room).emit("issue:activity", {
@@ -748,6 +877,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
       for (const activity of relatedActivities) {
         emitActivity(socket, {
           ...activity,
+
           active: false,
         });
       }
@@ -836,6 +966,21 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
           issue,
         });
+
+      if (issue.assigneeId) {
+        const notification = await getAssignmentNotification(
+          issue.id,
+          issue.assigneeId,
+          new Date(issue.createdAt),
+        );
+
+        if (notification) {
+          io.to(getUserRoom(notification.recipientId)).emit(
+            "notification:created",
+            notification,
+          );
+        }
+      }
     });
 
     socket.on("issue:updated", async (payload) => {
@@ -865,6 +1010,21 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
           issue,
         });
+
+      if (issue.assigneeId) {
+        const notification = await getAssignmentNotification(
+          issue.id,
+          issue.assigneeId,
+          new Date(issue.updatedAt),
+        );
+
+        if (notification) {
+          io.to(getUserRoom(notification.recipientId)).emit(
+            "notification:created",
+            notification,
+          );
+        }
+      }
     });
 
     socket.on("issue:moved", async (payload) => {

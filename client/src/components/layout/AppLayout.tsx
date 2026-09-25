@@ -1,72 +1,33 @@
-import { Link, Outlet, useNavigate } from "react-router";
+import { useState } from "react";
 
-import NotificationBell from "../Notifications/NotificationBell";
+import { Outlet } from "react-router";
 
-import { useAuth } from "../../hooks/useAuth";
+import Sidebar from "./Sidebar";
+
+import Topbar from "./Topbar";
 
 function AppLayout() {
-  const navigate = useNavigate();
-
-  const { user, accessToken, logout } = useAuth();
-
-  async function handleLogout() {
-    await logout();
-
-    navigate("/login", {
-      replace: true,
-    });
-  }
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-4">
-          <div className="flex items-center gap-8">
-            <Link
-              to="/dashboard"
-              className="text-xl font-bold tracking-tight text-white"
-            >
-              Collab
-              <span className="text-cyan-400">Flow</span>
-            </Link>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute left-[18%] top-[-14rem] h-[30rem] w-[30rem] rounded-full bg-cyan-500/[0.035] blur-3xl" />
 
-            <nav className="hidden items-center gap-5 sm:flex">
-              <Link
-                to="/dashboard"
-                className="text-sm font-medium text-slate-400 transition hover:text-cyan-300"
-              >
-                Dashboard
-              </Link>
-            </nav>
+        <div className="absolute bottom-[-15rem] right-[-10rem] h-[32rem] w-[32rem] rounded-full bg-blue-500/[0.035] blur-3xl" />
+      </div>
+
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="relative min-h-screen lg:pl-72">
+        <Topbar onMenuClick={() => setSidebarOpen(true)} />
+
+        <main className="min-h-[calc(100vh-5rem)]">
+          <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <Outlet />
           </div>
-
-          <div className="flex items-center gap-3">
-            {accessToken && <NotificationBell />}
-
-            {user && (
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-medium text-white">{user.name}</p>
-
-                <p className="text-xs text-slate-500">{user.email}</p>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                void handleLogout();
-              }}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main>
-        <Outlet />
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
