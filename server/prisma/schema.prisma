@@ -33,6 +33,7 @@ enum IssuePriority {
 
 enum NotificationType {
   COMMENT_MENTION
+  ISSUE_ASSIGNED
 }
 
 model User {

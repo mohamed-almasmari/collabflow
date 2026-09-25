@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useNavigate } from "react-router";
 
@@ -9,30 +9,81 @@ import {
   type Notification,
 } from "../../api/notifications";
 
+import { useAuth } from "../../hooks/useAuth";
+
 import { getSocket } from "../../socket/socket";
 
-interface NotificationBellProps {
-  accessToken: string;
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function getNotificationText(notification: Notification) {
+function formatNotificationMessage(notification: Notification) {
   switch (notification.type) {
+    case "ISSUE_ASSIGNED":
+      return `${notification.actor.name} assigned you "${notification.issue.title}"`;
+
     case "COMMENT_MENTION":
       return `${notification.actor.name} mentioned you in "${notification.issue.title}"`;
+
+    default:
+      return "You have a new notification";
   }
 }
 
-function NotificationBell({ accessToken }: NotificationBellProps) {
+function formatNotificationContext(notification: Notification) {
+  if (notification.type === "ISSUE_ASSIGNED") {
+    return `${notification.workspace.name} · ${notification.project.name}`;
+  }
+
+  if (notification.comment) {
+    const body = notification.comment.body.trim();
+
+    if (body.length > 80) {
+      return `${body.slice(0, 80)}...`;
+    }
+
+    return body;
+  }
+
+  return `${notification.workspace.name} · ${notification.project.name}`;
+}
+
+function formatRelativeTime(createdAt: string) {
+  const created = new Date(createdAt);
+
+  const now = new Date();
+
+  const difference = now.getTime() - created.getTime();
+
+  const seconds = Math.floor(difference / 1000);
+
+  if (seconds < 60) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(seconds / 60);
+
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+
+  return created.toLocaleDateString();
+}
+
+function NotificationBell() {
+  const { accessToken } = useAuth();
+
   const navigate = useNavigate();
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -42,52 +93,82 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
 
   const [loading, setLoading] = useState(false);
 
+  const [markingAll, setMarkingAll] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
 
-  async function loadNotifications() {
-    try {
-      setLoading(true);
-
-      setError(null);
-
-      const data = await getNotifications(accessToken);
-
-      setNotifications(data.notifications);
-
-      setUnreadCount(data.unreadCount);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to load notifications",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
+    if (!accessToken) {
+      setNotifications([]);
+
+      setUnreadCount(0);
+
+      return;
+    }
+
+    const currentAccessToken = accessToken;
+
+    let cancelled = false;
+
+    async function loadNotifications() {
+      try {
+        setLoading(true);
+
+        setError(null);
+
+        const data = await getNotifications(currentAccessToken);
+
+        if (cancelled) {
+          return;
+        }
+
+        setNotifications(data.notifications);
+
+        setUnreadCount(data.unreadCount);
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load notifications",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
     void loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
   }, [accessToken]);
 
   useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
     const socket = getSocket(accessToken);
 
     function handleNotificationCreated(notification: Notification) {
-      setNotifications((currentNotifications) => {
-        const exists = currentNotifications.some(
-          (currentNotification) => currentNotification.id === notification.id,
+      setNotifications((current) => {
+        const alreadyExists = current.some(
+          (item) => item.id === notification.id,
         );
 
-        if (exists) {
-          return currentNotifications;
+        if (alreadyExists) {
+          return current;
         }
 
-        return [notification, ...currentNotifications].slice(0, 50);
+        return [notification, ...current].slice(0, 50);
       });
 
       if (!notification.readAt) {
-        setUnreadCount((currentCount) => currentCount + 1);
+        setUnreadCount((current) => current + 1);
       }
     }
 
@@ -98,100 +179,119 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
     };
   }, [accessToken]);
 
-  async function handleNotificationClick(notification: Notification) {
-    try {
-      if (!notification.readAt) {
-        const result = await markNotificationRead(notification.id, accessToken);
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
 
-        setUnreadCount(result.unreadCount);
-
-        setNotifications((currentNotifications) =>
-          currentNotifications.map((currentNotification) =>
-            currentNotification.id === notification.id
-              ? {
-                  ...currentNotification,
-
-                  readAt:
-                    result.notification?.readAt ?? new Date().toISOString(),
-                }
-              : currentNotification,
-          ),
-        );
+      if (!(target instanceof Node)) {
+        return;
       }
 
-      setOpen(false);
-
-      navigate(
-        `/workspaces/${notification.workspaceId}/projects/${notification.projectId}/board?issue=${notification.issueId}`,
-      );
-    } catch (clickError) {
-      setError(
-        clickError instanceof Error
-          ? clickError.message
-          : "Unable to open notification",
-      );
+      if (containerRef.current && !containerRef.current.contains(target)) {
+        setOpen(false);
+      }
     }
+
+    document.addEventListener("mousedown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, []);
+
+  async function handleNotificationClick(notification: Notification) {
+    if (!accessToken) {
+      return;
+    }
+
+    setOpen(false);
+
+    if (!notification.readAt) {
+      try {
+        const updated = await markNotificationRead(
+          notification.id,
+          accessToken,
+        );
+
+        setNotifications((current) =>
+          current.map((item) => (item.id === notification.id ? updated : item)),
+        );
+
+        setUnreadCount((current) => Math.max(0, current - 1));
+      } catch (readError) {
+        console.error("Unable to mark notification as read:", readError);
+      }
+    }
+
+    navigate(
+      `/workspaces/${notification.workspaceId}/projects/${notification.projectId}/board?issue=${notification.issueId}`,
+    );
   }
 
   async function handleMarkAllRead() {
+    if (!accessToken || unreadCount === 0) {
+      return;
+    }
+
     try {
+      setMarkingAll(true);
+
       setError(null);
 
-      const result = await markAllNotificationsRead(accessToken);
+      await markAllNotificationsRead(accessToken);
 
-      setUnreadCount(result.unreadCount);
+      const readAt = new Date().toISOString();
 
-      const now = new Date().toISOString();
-
-      setNotifications((currentNotifications) =>
-        currentNotifications.map((notification) => ({
+      setNotifications((current) =>
+        current.map((notification) => ({
           ...notification,
 
-          readAt: notification.readAt ?? now,
+          readAt: notification.readAt ?? readAt,
         })),
       );
-    } catch (markError) {
+
+      setUnreadCount(0);
+    } catch (markAllError) {
       setError(
-        markError instanceof Error
-          ? markError.message
-          : "Unable to update notifications",
+        markAllError instanceof Error
+          ? markAllError.message
+          : "Unable to mark notifications as read",
       );
+    } finally {
+      setMarkingAll(false);
     }
   }
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
         aria-label="Notifications"
-        onClick={() => {
-          setOpen((currentOpen) => !currentOpen);
-
-          if (!open) {
-            void loadNotifications();
-          }
-        }}
-        className="relative rounded-lg border border-slate-700 px-3 py-2 text-slate-300 transition hover:bg-slate-800 hover:text-white"
+        aria-expanded={open}
       >
         <span aria-hidden="true" className="text-lg">
           🔔
         </span>
 
         {unreadCount > 0 && (
-          <span className="absolute -right-2 -top-2 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-cyan-500 px-1 text-[10px] font-bold text-slate-950">
+          <span className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-cyan-500 px-1 text-[10px] font-bold text-slate-950">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-3 w-[360px] overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
-          <header className="flex items-center justify-between border-b border-slate-800 p-4">
+        <div className="absolute right-0 z-50 mt-3 w-[360px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/30">
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
             <div>
               <h2 className="font-semibold text-white">Notifications</h2>
 
-              <p className="mt-1 text-xs text-slate-500">
-                {unreadCount} unread
+              <p className="mt-0.5 text-xs text-slate-500">
+                {unreadCount === 0
+                  ? "You're all caught up"
+                  : `${unreadCount} unread`}
               </p>
             </div>
 
@@ -201,78 +301,92 @@ function NotificationBell({ accessToken }: NotificationBellProps) {
                 onClick={() => {
                   void handleMarkAllRead();
                 }}
-                className="text-xs font-medium text-cyan-400 hover:text-cyan-300"
+                disabled={markingAll}
+                className="text-xs font-medium text-cyan-400 transition hover:text-cyan-300 disabled:opacity-50"
               >
-                Mark all read
+                {markingAll ? "Marking..." : "Mark all read"}
               </button>
             )}
-          </header>
+          </div>
 
           {error && (
-            <div className="border-b border-red-900 bg-red-950/30 p-3 text-xs text-red-300">
+            <div className="border-b border-red-900/60 bg-red-950/30 px-4 py-3 text-xs text-red-300">
               {error}
             </div>
           )}
 
-          <div className="max-h-[480px] overflow-y-auto">
-            {loading && notifications.length === 0 ? (
-              <p className="p-5 text-sm text-slate-500">
+          <div className="max-h-[420px] overflow-y-auto">
+            {loading ? (
+              <div className="px-4 py-8 text-center text-sm text-slate-500">
                 Loading notifications...
-              </p>
+              </div>
             ) : notifications.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-sm text-slate-400">No notifications yet.</p>
+              <div className="px-6 py-10 text-center">
+                <div className="text-2xl">🔔</div>
+
+                <p className="mt-3 text-sm font-medium text-slate-300">
+                  No notifications
+                </p>
 
                 <p className="mt-1 text-xs text-slate-600">
-                  Mentions will appear here.
+                  Mentions and issue assignments will appear here.
                 </p>
               </div>
             ) : (
-              notifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  type="button"
-                  onClick={() => {
-                    void handleNotificationClick(notification);
-                  }}
-                  className={`
-                      block w-full border-b border-slate-800 p-4 text-left transition last:border-b-0 hover:bg-slate-800/70
-                      ${notification.readAt ? "bg-slate-900" : "bg-cyan-500/5"}
-                    `}
-                >
-                  <div className="flex gap-3">
-                    <span
-                      className={`
-                          mt-2 h-2 w-2 shrink-0 rounded-full
-                          ${
-                            notification.readAt ? "bg-slate-700" : "bg-cyan-400"
-                          }
-                        `}
-                    />
+              notifications.map((notification) => {
+                const unread = !notification.readAt;
 
-                    <div className="min-w-0">
-                      <p className="text-sm leading-5 text-slate-200">
-                        {getNotificationText(notification)}
-                      </p>
+                const assignment = notification.type === "ISSUE_ASSIGNED";
 
-                      <p className="mt-1 text-xs text-slate-500">
-                        {notification.workspace.name} ·{" "}
-                        {notification.project.name}
-                      </p>
-
-                      {notification.comment && (
-                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
-                          {notification.comment.body}
-                        </p>
-                      )}
-
-                      <time className="mt-2 block text-xs text-slate-600">
-                        {formatDate(notification.createdAt)}
-                      </time>
+                return (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    onClick={() => {
+                      void handleNotificationClick(notification);
+                    }}
+                    className={`flex w-full gap-3 border-b border-slate-800/80 px-4 py-4 text-left transition last:border-b-0 hover:bg-slate-800/70 ${
+                      unread ? "bg-cyan-500/[0.04]" : ""
+                    }`}
+                  >
+                    <div
+                      className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm ${
+                        assignment
+                          ? "border-violet-500/30 bg-violet-500/10 text-violet-300"
+                          : "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+                      }`}
+                    >
+                      {assignment ? "→" : "@"}
                     </div>
-                  </div>
-                </button>
-              ))
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        <p
+                          className={`flex-1 text-sm leading-5 ${
+                            unread
+                              ? "font-medium text-slate-100"
+                              : "text-slate-300"
+                          }`}
+                        >
+                          {formatNotificationMessage(notification)}
+                        </p>
+
+                        {unread && (
+                          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
+                        )}
+                      </div>
+
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                        {formatNotificationContext(notification)}
+                      </p>
+
+                      <p className="mt-1.5 text-[11px] text-slate-600">
+                        {formatRelativeTime(notification.createdAt)}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

@@ -188,9 +188,11 @@ export async function getIssues(req: AuthenticatedRequest, res: Response) {
         {
           status: "asc",
         },
+
         {
           position: "asc",
         },
+
         {
           createdAt: "asc",
         },
@@ -370,34 +372,62 @@ export async function createIssue(req: AuthenticatedRequest, res: Response) {
       },
     });
 
-    const issue = await prisma.issue.create({
-      data: {
-        title: parsed.data.title,
+    const issue = await prisma.$transaction(async (transaction) => {
+      const createdIssue = await transaction.issue.create({
+        data: {
+          title: parsed.data.title,
 
-        description: parsed.data.description ?? null,
+          description: parsed.data.description ?? null,
 
-        priority: parsed.data.priority ?? "MEDIUM",
+          priority: parsed.data.priority ?? "MEDIUM",
 
-        status: "TODO",
+          status: "TODO",
 
-        position: (lastIssue?.position ?? -1) + 1,
+          position: (lastIssue?.position ?? -1) + 1,
 
-        dueDate: parsed.data.dueDate ? parseDueDate(parsed.data.dueDate) : null,
+          dueDate: parsed.data.dueDate
+            ? parseDueDate(parsed.data.dueDate)
+            : null,
 
-        projectId,
+          projectId,
 
-        createdById: userId,
+          createdById: userId,
 
-        assigneeId: parsed.data.assigneeId ?? null,
+          assigneeId: parsed.data.assigneeId ?? null,
 
-        issueLabels: {
-          create: uniqueLabelIds.map((labelId) => ({
-            labelId,
-          })),
+          issueLabels: {
+            create: uniqueLabelIds.map((labelId) => ({
+              labelId,
+            })),
+          },
         },
-      },
 
-      include: issueInclude,
+        include: issueInclude,
+      });
+
+      const assigneeId = parsed.data.assigneeId;
+
+      if (assigneeId && assigneeId !== userId) {
+        await transaction.notification.create({
+          data: {
+            type: "ISSUE_ASSIGNED",
+
+            recipientId: assigneeId,
+
+            actorId: userId,
+
+            workspaceId,
+
+            projectId,
+
+            issueId: createdIssue.id,
+
+            commentId: null,
+          },
+        });
+      }
+
+      return createdIssue;
     });
 
     res.status(201).json({
@@ -477,6 +507,8 @@ export async function updateIssue(req: AuthenticatedRequest, res: Response) {
 
       select: {
         id: true,
+
+        assigneeId: true,
       },
     });
 
@@ -515,6 +547,12 @@ export async function updateIssue(req: AuthenticatedRequest, res: Response) {
       parsed.data.labelIds !== undefined
         ? [...new Set(parsed.data.labelIds)]
         : undefined;
+
+    const shouldNotifyAssignee =
+      parsed.data.assigneeId !== undefined &&
+      parsed.data.assigneeId !== null &&
+      parsed.data.assigneeId !== existingIssue.assigneeId &&
+      parsed.data.assigneeId !== userId;
 
     await prisma.$transaction(async (transaction) => {
       if (uniqueLabelIds !== undefined) {
@@ -577,6 +615,26 @@ export async function updateIssue(req: AuthenticatedRequest, res: Response) {
             : {}),
         },
       });
+
+      if (shouldNotifyAssignee && parsed.data.assigneeId) {
+        await transaction.notification.create({
+          data: {
+            type: "ISSUE_ASSIGNED",
+
+            recipientId: parsed.data.assigneeId,
+
+            actorId: userId,
+
+            workspaceId,
+
+            projectId,
+
+            issueId,
+
+            commentId: null,
+          },
+        });
+      }
     });
 
     const issue = await prisma.issue.findUnique({

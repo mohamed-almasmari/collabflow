@@ -68,7 +68,7 @@ interface RealtimeComment {
 interface RealtimeNotification {
   id: string;
 
-  type: "COMMENT_MENTION";
+  type: "COMMENT_MENTION" | "ISSUE_ASSIGNED";
 
   recipientId: string;
   actorId: string;

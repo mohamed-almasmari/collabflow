@@ -41,7 +41,7 @@ function AppLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            {accessToken && <NotificationBell accessToken={accessToken} />}
+            {accessToken && <NotificationBell />}
 
             {user && (
               <div className="hidden text-right sm:block">

@@ -1,8 +1,8 @@
 const API_URL = "http://localhost:3000/api";
 
-export type NotificationType = "COMMENT_MENTION";
+export type NotificationType = "COMMENT_MENTION" | "ISSUE_ASSIGNED";
 
-export interface NotificationActor {
+export interface NotificationUser {
   id: string;
   name: string;
   email: string;
@@ -34,22 +34,18 @@ export interface Notification {
   type: NotificationType;
 
   recipientId: string;
-
   actorId: string;
 
   workspaceId: string;
-
   projectId: string;
-
   issueId: string;
 
   commentId: string | null;
 
   readAt: string | null;
-
   createdAt: string;
 
-  actor: NotificationActor;
+  actor: NotificationUser;
 
   workspace: NotificationWorkspace;
 
@@ -60,30 +56,15 @@ export interface Notification {
   comment: NotificationComment | null;
 }
 
-interface NotificationsResponse {
+export interface NotificationsResponse {
   notifications: Notification[];
-
   unreadCount: number;
 }
 
-interface NotificationMutationResponse {
-  message: string;
+async function getErrorMessage(response: Response) {
+  const data = await response.json().catch(() => null);
 
-  notification?: Notification;
-
-  unreadCount: number;
-}
-
-interface ApiErrorResponse {
-  message?: string;
-}
-
-async function getErrorMessage(response: Response, fallback: string) {
-  const data = (await response
-    .json()
-    .catch(() => null)) as ApiErrorResponse | null;
-
-  return data?.message ?? fallback;
+  return data?.message ?? "Notification request failed";
 }
 
 export async function getNotifications(
@@ -100,9 +81,7 @@ export async function getNotifications(
   });
 
   if (!response.ok) {
-    throw new Error(
-      await getErrorMessage(response, "Unable to load notifications"),
-    );
+    throw new Error(await getErrorMessage(response));
   }
 
   return response.json();
@@ -111,7 +90,7 @@ export async function getNotifications(
 export async function markNotificationRead(
   notificationId: string,
   accessToken: string,
-): Promise<NotificationMutationResponse> {
+): Promise<Notification> {
   const response = await fetch(
     `${API_URL}/notifications/${notificationId}/read`,
     {
@@ -126,17 +105,17 @@ export async function markNotificationRead(
   );
 
   if (!response.ok) {
-    throw new Error(
-      await getErrorMessage(response, "Unable to update notification"),
-    );
+    throw new Error(await getErrorMessage(response));
   }
 
-  return response.json();
+  const data = await response.json();
+
+  return data.notification;
 }
 
 export async function markAllNotificationsRead(
   accessToken: string,
-): Promise<NotificationMutationResponse> {
+): Promise<void> {
   const response = await fetch(`${API_URL}/notifications/read-all`, {
     method: "PATCH",
 
@@ -148,10 +127,6 @@ export async function markAllNotificationsRead(
   });
 
   if (!response.ok) {
-    throw new Error(
-      await getErrorMessage(response, "Unable to update notifications"),
-    );
+    throw new Error(await getErrorMessage(response));
   }
-
-  return response.json();
 }
