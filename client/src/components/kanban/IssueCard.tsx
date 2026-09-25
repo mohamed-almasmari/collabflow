@@ -10,15 +10,10 @@ import IssueChecklist from "./IssueChecklist";
 
 interface IssueCardProps {
   issue: Issue;
-
   activities: IssueActivity[];
-
   onComments: (issue: Issue) => void;
-
   onEdit: (issue: Issue) => void;
-
   onDelete: (issue: Issue) => void;
-
   onDragActivity: (issueId: string, active: boolean) => void;
 }
 
@@ -27,27 +22,21 @@ function getPriorityStyles(priority: Issue["priority"]) {
     case "URGENT":
       return {
         dot: "bg-rose-400",
-
         text: "text-rose-300",
-
         background: "bg-rose-500/10",
       };
 
     case "HIGH":
       return {
         dot: "bg-orange-400",
-
         text: "text-orange-300",
-
         background: "bg-orange-500/10",
       };
 
     case "MEDIUM":
       return {
         dot: "bg-amber-400",
-
         text: "text-amber-300",
-
         background: "bg-amber-500/10",
       };
 
@@ -55,9 +44,7 @@ function getPriorityStyles(priority: Issue["priority"]) {
     default:
       return {
         dot: "bg-blue-400",
-
         text: "text-blue-300",
-
         background: "bg-blue-500/10",
       };
   }
@@ -92,9 +79,7 @@ function getDueDateInfo(issue: Issue) {
 
   const formatted = new Intl.DateTimeFormat(undefined, {
     month: "short",
-
     day: "numeric",
-
     year:
       dueDateValue.getFullYear() !== todayDate.getFullYear()
         ? "numeric"
@@ -222,9 +207,9 @@ function IssueCard({
     <article
       ref={setNodeRef}
       style={style}
-      className={`group rounded-lg border border-slate-800 bg-slate-900/90 p-3 transition ${
+      className={`group rounded-lg border border-slate-800 bg-slate-900/85 p-3 outline-none transition ${
         isDragging
-          ? "scale-[0.98] opacity-40"
+          ? "scale-[0.98] opacity-40 shadow-lg"
           : "hover:border-slate-700 hover:bg-slate-900"
       }`}
     >
@@ -233,29 +218,35 @@ function IssueCard({
           type="button"
           {...attributes}
           {...listeners}
+          onPointerDown={() => {
+            onDragActivity(issue.id, true);
+          }}
           onPointerUp={() => {
             onDragActivity(issue.id, false);
           }}
-          className="mt-0.5 cursor-grab rounded px-1 py-0.5 text-[12px] leading-none text-slate-700 transition hover:bg-slate-800 hover:text-slate-400 active:cursor-grabbing"
+          onPointerCancel={() => {
+            onDragActivity(issue.id, false);
+          }}
+          className="mt-0.5 cursor-grab rounded px-1 py-0.5 text-[12px] leading-none text-slate-700 outline-none transition hover:bg-slate-800 hover:text-slate-400 focus-visible:ring-2 focus-visible:ring-cyan-500/50 active:cursor-grabbing"
           aria-label={`Drag ${issue.title}`}
         >
           ⠿
         </button>
 
         <div className="min-w-0 flex-1">
-          <h3 className="text-[13px] font-medium leading-5 text-slate-100">
+          <h3 className="break-words text-[13px] font-medium leading-5 text-slate-100">
             {issue.title}
           </h3>
 
           {issue.description && (
-            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-600">
+            <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-600">
               {issue.description}
             </p>
           )}
         </div>
 
         <span
-          className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide ${priorityStyles.background} ${priorityStyles.text}`}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[8px] font-semibold uppercase tracking-wide ${priorityStyles.background} ${priorityStyles.text}`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${priorityStyles.dot}`} />
 
@@ -268,7 +259,7 @@ function IssueCard({
           {issue.issueLabels.map(({ label }) => (
             <span
               key={label.id}
-              className="rounded-md px-1.5 py-0.5 text-[9px] font-medium"
+              className="rounded-md px-1.5 py-0.5 text-[8px] font-medium"
               style={{
                 color: label.color,
 
@@ -286,7 +277,7 @@ function IssueCard({
           {editingUsers.map((activity) => (
             <div
               key={`editing-${activity.user.id}`}
-              className="flex items-center gap-1.5 text-[10px] text-cyan-400"
+              className="flex items-center gap-1.5 text-[9px] text-cyan-400"
             >
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
               {activity.user.name} is editing
@@ -296,7 +287,7 @@ function IssueCard({
           {draggingUsers.map((activity) => (
             <div
               key={`dragging-${activity.user.id}`}
-              className="flex items-center gap-1.5 text-[10px] text-violet-400"
+              className="flex items-center gap-1.5 text-[9px] text-violet-400"
             >
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
               {activity.user.name} is moving
@@ -309,8 +300,8 @@ function IssueCard({
         <IssueChecklist issueId={issue.id} />
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-2.5">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="mt-2.5 flex flex-col gap-2 border-t border-slate-800/70 pt-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {issue.assignee ? (
             <>
               <div
@@ -322,49 +313,51 @@ function IssueCard({
                 {getInitials(issue.assignee.name)}
               </div>
 
-              <span className="max-w-20 truncate text-[10px] text-slate-500">
+              <span className="max-w-24 truncate text-[9px] text-slate-500">
                 {issue.assignee.name}
               </span>
             </>
           ) : (
-            <span className="text-[10px] text-slate-700">Unassigned</span>
+            <span className="text-[9px] text-slate-700">Unassigned</span>
           )}
 
           {dueDateInfo && (
             <>
-              <span className="text-slate-800">•</span>
+              <span className="text-slate-800" aria-hidden="true">
+                •
+              </span>
 
-              <span className={`truncate text-[10px] ${dueDateInfo.className}`}>
+              <span className={`truncate text-[9px] ${dueDateInfo.className}`}>
                 {dueDateInfo.label}
               </span>
             </>
           )}
         </div>
 
-        <div className="flex items-center gap-0.5 opacity-50 transition group-hover:opacity-100">
+        <div className="flex items-center gap-0.5 opacity-80 transition sm:opacity-50 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
           <button
             type="button"
-            title="Comments"
             onClick={() => onComments(issue)}
-            className="rounded-md px-1.5 py-1 text-[10px] text-slate-500 transition hover:bg-cyan-500/10 hover:text-cyan-300"
+            className="rounded-md px-1.5 py-1 text-[9px] text-slate-500 outline-none transition hover:bg-cyan-500/10 hover:text-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+            aria-label={`Open comments for ${issue.title}`}
           >
             Chat
           </button>
 
           <button
             type="button"
-            title="Edit issue"
             onClick={() => onEdit(issue)}
-            className="rounded-md px-1.5 py-1 text-[10px] text-slate-500 transition hover:bg-violet-500/10 hover:text-violet-300"
+            className="rounded-md px-1.5 py-1 text-[9px] text-slate-500 outline-none transition hover:bg-violet-500/10 hover:text-violet-300 focus-visible:ring-2 focus-visible:ring-violet-500/50"
+            aria-label={`Edit ${issue.title}`}
           >
             Edit
           </button>
 
           <button
             type="button"
-            title="Delete issue"
             onClick={() => onDelete(issue)}
-            className="rounded-md px-1.5 py-1 text-[10px] text-slate-600 transition hover:bg-rose-500/10 hover:text-rose-300"
+            className="rounded-md px-1.5 py-1 text-[11px] text-slate-600 outline-none transition hover:bg-rose-500/10 hover:text-rose-300 focus-visible:ring-2 focus-visible:ring-rose-500/50"
+            aria-label={`Delete ${issue.title}`}
           >
             ×
           </button>

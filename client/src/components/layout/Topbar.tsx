@@ -44,11 +44,11 @@ function Topbar({ onMenuClick }: TopbarProps) {
   const initials = getInitials(displayName) || "CF";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center border-b border-slate-800 bg-slate-950/95 px-4 backdrop-blur sm:px-5">
+    <header className="sticky top-0 z-30 flex h-14 items-center border-b border-slate-800/80 bg-slate-950/95 px-3 backdrop-blur sm:px-4 lg:px-5">
       <button
         type="button"
         onClick={onMenuClick}
-        className="mr-3 rounded-lg p-2 text-slate-400 transition hover:bg-slate-900 hover:text-white lg:hidden"
+        className="mr-2 rounded-md p-2 text-slate-500 outline-none transition hover:bg-slate-900 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-500/50 lg:hidden"
         aria-label="Open navigation"
       >
         <svg
@@ -64,13 +64,13 @@ function Topbar({ onMenuClick }: TopbarProps) {
       </button>
 
       <div className="flex min-w-0 flex-1 items-center">
-        <div className="hidden w-full max-w-sm items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 sm:flex">
+        <div className="hidden h-8 w-full max-w-xs items-center gap-2 rounded-md border border-slate-800 bg-slate-900/50 px-2.5 sm:flex">
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.8"
-            className="h-4 w-4 shrink-0 text-slate-600"
+            className="h-3.5 w-3.5 shrink-0 text-slate-600"
             aria-hidden="true"
           >
             <circle cx="11" cy="11" r="7" />
@@ -78,41 +78,41 @@ function Topbar({ onMenuClick }: TopbarProps) {
             <path d="m16 16 4 4" />
           </svg>
 
-          <span className="truncate text-xs text-slate-600">
+          <span className="truncate text-[10px] text-slate-600">
             Search projects and issues
           </span>
 
-          <kbd className="ml-auto rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-500">
+          <kbd className="ml-auto rounded border border-slate-800 bg-slate-950 px-1.5 py-0.5 text-[8px] text-slate-700">
             /
           </kbd>
         </div>
 
-        <span className="text-sm font-medium text-white sm:hidden">
-          Dashboard
+        <span className="truncate text-xs font-medium text-slate-200 sm:hidden">
+          CollabFlow
         </span>
       </div>
 
-      <div className="ml-3 flex items-center gap-2">
+      <div className="ml-3 flex items-center gap-1.5">
         {accessToken && <NotificationBell />}
 
         <div className="relative">
           <button
             type="button"
             onClick={() => setProfileOpen((current) => !current)}
-            className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition hover:bg-slate-900"
+            aria-expanded={profileOpen}
+            aria-haspopup="menu"
+            className="flex items-center gap-2 rounded-md px-1 py-1 outline-none transition hover:bg-slate-900 focus-visible:ring-2 focus-visible:ring-violet-500/50"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-[11px] font-bold text-white">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500 text-[9px] font-bold text-white">
               {initials}
             </div>
 
-            <div className="hidden text-left md:block">
-              <p className="max-w-32 truncate text-xs font-medium text-slate-200">
+            <div className="hidden max-w-32 text-left md:block">
+              <p className="truncate text-[10px] font-medium text-slate-300">
                 {displayName}
               </p>
 
-              <p className="max-w-32 truncate text-[10px] text-slate-600">
-                {email}
-              </p>
+              <p className="truncate text-[8px] text-slate-600">{email}</p>
             </div>
 
             <svg
@@ -120,7 +120,9 @@ function Topbar({ onMenuClick }: TopbarProps) {
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              className="hidden h-3.5 w-3.5 text-slate-600 md:block"
+              className={`hidden h-3 w-3 text-slate-600 transition-transform md:block ${
+                profileOpen ? "rotate-180" : ""
+              }`}
               aria-hidden="true"
             >
               <path d="m7 10 5 5 5-5" />
@@ -128,29 +130,35 @@ function Topbar({ onMenuClick }: TopbarProps) {
           </button>
 
           {profileOpen && (
-            <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl shadow-black/30">
-              <div className="border-b border-slate-800 px-4 py-3">
-                <p className="truncate text-sm font-medium text-white">
+            <div
+              role="menu"
+              className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-slate-800 bg-slate-900 shadow-xl shadow-black/30"
+            >
+              <div className="border-b border-slate-800 px-3 py-2.5">
+                <p className="truncate text-xs font-medium text-slate-200">
                   {displayName}
                 </p>
 
-                <p className="mt-1 truncate text-xs text-slate-500">{email}</p>
+                <p className="mt-0.5 truncate text-[9px] text-slate-600">
+                  {email}
+                </p>
               </div>
 
-              <div className="p-1.5">
+              <div className="p-1">
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={() => {
                     void handleLogout();
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[10px] text-slate-400 outline-none transition hover:bg-slate-800 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-500/50"
                 >
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.8"
-                    className="h-4 w-4"
+                    className="h-3.5 w-3.5"
                     aria-hidden="true"
                   >
                     <path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4" />
