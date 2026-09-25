@@ -4,6 +4,8 @@ import { Link, useNavigate } from "react-router";
 
 import { registerUser } from "../../api/auth.ts";
 
+import AuthFlowVisual from "../../components/auth/AuthFlowVisual";
+
 function RegisterPage() {
   const navigate = useNavigate();
 
@@ -28,7 +30,7 @@ function RegisterPage() {
 
     setError(null);
 
-    if (password !== confirmPassword) {
+    if (!passwordsMatch) {
       setError("Passwords do not match");
 
       return;
@@ -58,292 +60,186 @@ function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="grid min-h-screen lg:grid-cols-[1fr_520px]">
-        <section className="hidden border-r border-slate-800/80 lg:flex lg:flex-col lg:justify-between lg:p-10 xl:p-14">
-          <div>
+    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
+      <div className="pointer-events-none absolute left-[8%] top-[10%] h-80 w-80 animate-pulse rounded-full bg-violet-500/[0.07] blur-3xl" />
+
+      <div className="pointer-events-none absolute bottom-[5%] right-[8%] h-96 w-96 animate-pulse rounded-full bg-cyan-500/[0.07] blur-3xl [animation-delay:700ms]" />
+
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1050px]">
+          <div className="mb-5 flex justify-start">
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+              className="group inline-flex items-center gap-2.5"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-cyan-400 text-[10px] font-black text-slate-950">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-violet-400 to-cyan-400 text-[10px] font-black text-slate-950 shadow-lg shadow-violet-500/20 transition group-hover:scale-105">
                 CF
               </div>
 
-              <span className="text-sm font-semibold tracking-tight text-slate-100">
+              <span className="text-sm font-semibold text-slate-100">
                 CollabFlow
               </span>
             </Link>
           </div>
 
-          <div className="max-w-lg">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-400">
-              Work better together
-            </p>
-
-            <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-white xl:text-5xl">
-              Turn ideas into work.
-              <span className="block text-slate-500">
-                Turn work into progress.
-              </span>
-            </h1>
-
-            <p className="mt-5 max-w-md text-sm leading-6 text-slate-500">
-              Create a workspace, organize projects, assign issues, and
-              collaborate with your team from one focused interface.
-            </p>
-
-            <div className="mt-8 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-cyan-500/10 text-cyan-400">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className="h-3.5 w-3.5"
-                    aria-hidden="true"
-                  >
-                    <path d="m5 12 4 4L19 6" />
-                  </svg>
-                </div>
-
-                <p className="text-xs text-slate-400">
-                  Real-time project collaboration
-                </p>
+          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 shadow-2xl shadow-black/40 backdrop-blur-xl">
+            <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
+              <div className="hidden border-r border-slate-800/80 lg:block">
+                <AuthFlowVisual mode="register" />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500/10 text-violet-400">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className="h-3.5 w-3.5"
-                    aria-hidden="true"
-                  >
-                    <path d="m5 12 4 4L19 6" />
-                  </svg>
-                </div>
-
-                <p className="text-xs text-slate-400">
-                  Issues, checklists, comments, and mentions
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className="h-3.5 w-3.5"
-                    aria-hidden="true"
-                  >
-                    <path d="m5 12 4 4L19 6" />
-                  </svg>
-                </div>
-
-                <p className="text-xs text-slate-400">
-                  Workspace roles and team management
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <p className="text-[9px] text-slate-700">CollabFlow</p>
-        </section>
-
-        <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
-          <div className="w-full max-w-sm">
-            <div className="mb-7 lg:hidden">
-              <Link to="/login" className="inline-flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-cyan-400 text-[10px] font-black text-slate-950">
-                  CF
-                </div>
-
-                <span className="text-sm font-semibold text-slate-100">
-                  CollabFlow
-                </span>
-              </Link>
-            </div>
-
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-400">
-                Get started
-              </p>
-
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                Create your account
-              </h2>
-
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Set up your CollabFlow account and create your first workspace.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-6 space-y-3.5">
-              <div>
-                <label
-                  htmlFor="name"
-                  className="mb-1.5 block text-[10px] font-medium text-slate-400"
-                >
-                  Name
-                </label>
-
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  autoComplete="name"
-                  placeholder="Your name"
-                  required
-                  className="h-10 w-full rounded-lg border border-slate-800 bg-slate-900/60 px-3 text-xs text-slate-200 outline-none transition placeholder:text-slate-700 hover:border-slate-700 focus:border-violet-500/70 focus:ring-2 focus:ring-violet-500/10"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-1.5 block text-[10px] font-medium text-slate-400"
-                >
-                  Email address
-                </label>
-
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  required
-                  className="h-10 w-full rounded-lg border border-slate-800 bg-slate-900/60 px-3 text-xs text-slate-200 outline-none transition placeholder:text-slate-700 hover:border-slate-700 focus:border-violet-500/70 focus:ring-2 focus:ring-violet-500/10"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="mb-1.5 block text-[10px] font-medium text-slate-400"
-                >
-                  Password
-                </label>
-
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    minLength={8}
-                    autoComplete="new-password"
-                    placeholder="Minimum 8 characters"
-                    required
-                    className="h-10 w-full rounded-lg border border-slate-800 bg-slate-900/60 px-3 pr-14 text-xs text-slate-200 outline-none transition placeholder:text-slate-700 hover:border-slate-700 focus:border-violet-500/70 focus:ring-2 focus:ring-violet-500/10"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((current) => !current)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-[9px] font-medium text-slate-600 outline-none transition hover:text-slate-300 focus-visible:text-violet-300"
-                    aria-label={
-                      showPassword ? "Hide passwords" : "Show passwords"
-                    }
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="mb-1.5 block text-[10px] font-medium text-slate-400"
-                >
-                  Confirm password
-                </label>
-
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  minLength={8}
-                  autoComplete="new-password"
-                  placeholder="Repeat your password"
-                  required
-                  aria-invalid={
-                    confirmPassword && !passwordsMatch ? true : undefined
-                  }
-                  className={`h-10 w-full rounded-lg border bg-slate-900/60 px-3 text-xs text-slate-200 outline-none transition placeholder:text-slate-700 focus:ring-2 ${
-                    confirmPassword && !passwordsMatch
-                      ? "border-rose-800 focus:border-rose-500 focus:ring-rose-500/10"
-                      : "border-slate-800 hover:border-slate-700 focus:border-violet-500/70 focus:ring-violet-500/10"
-                  }`}
-                />
-
-                {confirmPassword && !passwordsMatch && (
-                  <p className="mt-1.5 text-[9px] text-rose-400">
-                    Passwords do not match.
+              <section className="flex min-h-[570px] items-center justify-center p-6 sm:p-9">
+                <div className="w-full max-w-[340px]">
+                  <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-violet-400">
+                    Start collaborating
                   </p>
-                )}
-              </div>
 
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-lg border border-rose-900/50 bg-rose-950/25 px-3 py-2.5"
-                >
-                  <div className="flex items-start gap-2">
-                    <span
-                      className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400"
-                      aria-hidden="true"
-                    />
+                  <h2 className="mt-2 text-[26px] font-semibold tracking-[-0.025em] text-white">
+                    Create your account
+                  </h2>
 
-                    <p className="text-[10px] leading-4 text-rose-300">
-                      {error}
+                  <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                    Create a workspace and start moving work forward with your
+                    team.
+                  </p>
+
+                  <form onSubmit={handleSubmit} className="mt-6 space-y-3.5">
+                    <div>
+                      <label
+                        htmlFor="name"
+                        className="mb-1.5 block text-[10px] font-medium text-slate-400"
+                      >
+                        Name
+                      </label>
+
+                      <input
+                        id="name"
+                        type="text"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        required
+                        className="h-10 w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 text-xs text-slate-200 outline-none transition focus:border-violet-500/70 focus:ring-4 focus:ring-violet-500/[0.06]"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="email"
+                        className="mb-1.5 block text-[10px] font-medium text-slate-400"
+                      >
+                        Email
+                      </label>
+
+                      <input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        required
+                        className="h-10 w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 text-xs text-slate-200 outline-none transition focus:border-violet-500/70 focus:ring-4 focus:ring-violet-500/[0.06]"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="password"
+                        className="mb-1.5 block text-[10px] font-medium text-slate-400"
+                      >
+                        Password
+                      </label>
+
+                      <div className="relative">
+                        <input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          minLength={8}
+                          required
+                          className="h-10 w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 pr-14 text-xs text-slate-200 outline-none transition focus:border-violet-500/70 focus:ring-4 focus:ring-violet-500/[0.06]"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((current) => !current)}
+                          className="absolute inset-y-0 right-0 px-3 text-[9px] text-slate-600 transition hover:text-violet-300"
+                        >
+                          {showPassword ? "Hide" : "Show"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="confirmPassword"
+                        className="mb-1.5 block text-[10px] font-medium text-slate-400"
+                      >
+                        Confirm password
+                      </label>
+
+                      <input
+                        id="confirmPassword"
+                        type={showPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(event) =>
+                          setConfirmPassword(event.target.value)
+                        }
+                        minLength={8}
+                        required
+                        className="h-10 w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 text-xs text-slate-200 outline-none transition focus:border-violet-500/70 focus:ring-4 focus:ring-violet-500/[0.06]"
+                      />
+                    </div>
+
+                    {error && (
+                      <div
+                        role="alert"
+                        className="rounded-lg border border-rose-900/50 bg-rose-950/20 px-3 py-2 text-[10px] text-rose-300"
+                      >
+                        {error}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={
+                        loading ||
+                        !name.trim() ||
+                        !email.trim() ||
+                        password.length < 8 ||
+                        !passwordsMatch
+                      }
+                      className="group relative h-10 w-full overflow-hidden rounded-lg bg-violet-500 text-xs font-semibold text-white shadow-lg shadow-violet-500/10 transition hover:-translate-y-0.5 hover:bg-violet-400 hover:shadow-violet-500/20 disabled:translate-y-0 disabled:opacity-40"
+                    >
+                      <span className="relative z-10">
+                        {loading
+                          ? "Creating account..."
+                          : "Create workspace account"}
+                      </span>
+
+                      <span className="absolute inset-y-0 -left-16 w-12 rotate-12 bg-white/20 blur-md transition-all duration-700 group-hover:left-[110%]" />
+                    </button>
+                  </form>
+
+                  <div className="mt-5 border-t border-slate-800/70 pt-5 text-center">
+                    <p className="text-[10px] text-slate-600">
+                      Already have an account?{" "}
+                      <Link
+                        to="/login"
+                        className="font-semibold text-violet-400 transition hover:text-violet-300"
+                      >
+                        Sign in
+                      </Link>
                     </p>
                   </div>
                 </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={
-                  loading ||
-                  !name.trim() ||
-                  !email.trim() ||
-                  password.length < 8 ||
-                  !confirmPassword ||
-                  !passwordsMatch
-                }
-                className="flex h-10 w-full items-center justify-center rounded-lg bg-violet-500 px-4 text-xs font-semibold text-white outline-none transition hover:bg-violet-400 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {loading ? "Creating account..." : "Create account"}
-              </button>
-            </form>
-
-            <div className="mt-5 border-t border-slate-800/70 pt-5 text-center">
-              <p className="text-[10px] text-slate-600">
-                Already have an account?{" "}
-                <Link
-                  to="/login"
-                  className="font-semibold text-violet-400 outline-none transition hover:text-violet-300 focus-visible:underline"
-                >
-                  Sign in
-                </Link>
-              </p>
+              </section>
             </div>
           </div>
-        </section>
+
+          <p className="mt-4 text-center text-[8px] uppercase tracking-[0.18em] text-slate-800">
+            Plan · Collaborate · Deliver
+          </p>
+        </div>
       </div>
     </main>
   );
