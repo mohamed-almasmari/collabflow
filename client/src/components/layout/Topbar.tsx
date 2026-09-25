@@ -234,7 +234,7 @@ function Topbar({ onMenuClick }: TopbarProps) {
 
             <input
               ref={searchInputRef}
-              type="search"
+              type="text"
               value={query}
               onFocus={handleSearchFocus}
               onChange={(event) => {

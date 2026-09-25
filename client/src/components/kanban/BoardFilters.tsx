@@ -120,7 +120,7 @@ function BoardFilters({
 
           <input
             id="issue-search"
-            type="search"
+            type="text"
             value={searchText}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Search issues"
