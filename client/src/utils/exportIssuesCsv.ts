@@ -31,6 +31,14 @@ function formatFileName(projectName: string) {
   return `${safeName || "project"}-issues-${date}.csv`;
 }
 
+function formatDueDate(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return value.slice(0, 10);
+}
+
 export function exportIssuesToCsv(issues: Issue[], projectName: string) {
   const headers = [
     "ID",
@@ -39,6 +47,7 @@ export function exportIssuesToCsv(issues: Issue[], projectName: string) {
     "Status",
     "Priority",
     "Position",
+    "Due Date",
     "Assignee",
     "Assignee Email",
     "Created By",
@@ -58,6 +67,8 @@ export function exportIssuesToCsv(issues: Issue[], projectName: string) {
     issue.priority,
 
     issue.position,
+
+    formatDueDate(issue.dueDate),
 
     issue.assignee?.name ?? "Unassigned",
 

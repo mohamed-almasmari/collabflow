@@ -15,6 +15,28 @@ interface MemberWorkload {
   done: number;
 }
 
+function getTodayKey() {
+  const today = new Date();
+
+  const year = today.getFullYear();
+
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getDateDifference(dueDate: string) {
+  const todayKey = getTodayKey();
+
+  const today = new Date(`${todayKey}T00:00:00`);
+
+  const target = new Date(`${dueDate.slice(0, 10)}T00:00:00`);
+
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
 function BoardStats({ issues }: BoardStatsProps) {
   const stats = useMemo(() => {
     const total = issues.length;
@@ -36,6 +58,36 @@ function BoardStats({ issues }: BoardStatsProps) {
     const assigned = total - unassigned;
 
     const completionRate = total === 0 ? 0 : Math.round((done / total) * 100);
+
+    let overdue = 0;
+
+    let dueToday = 0;
+
+    let dueNextSevenDays = 0;
+
+    let noDueDate = 0;
+
+    for (const issue of issues) {
+      if (!issue.dueDate) {
+        noDueDate += 1;
+
+        continue;
+      }
+
+      const difference = getDateDifference(issue.dueDate);
+
+      if (issue.status !== "DONE" && difference < 0) {
+        overdue += 1;
+      }
+
+      if (issue.status !== "DONE" && difference === 0) {
+        dueToday += 1;
+      }
+
+      if (issue.status !== "DONE" && difference >= 0 && difference <= 7) {
+        dueNextSevenDays += 1;
+      }
+    }
 
     const workloadMap = new Map<string, MemberWorkload>();
 
@@ -94,6 +146,10 @@ function BoardStats({ issues }: BoardStatsProps) {
       assigned,
       unassigned,
       completionRate,
+      overdue,
+      dueToday,
+      dueNextSevenDays,
+      noDueDate,
       workload,
       maxActive,
     };
@@ -177,6 +233,94 @@ function BoardStats({ issues }: BoardStatsProps) {
           </div>
         </article>
       </div>
+
+      <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
+            Deadlines
+          </p>
+
+          <h2 className="mt-1 text-lg font-semibold text-white">
+            Deadline Health
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Current schedule risk across unfinished issues.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-400">
+              Overdue
+            </p>
+
+            <p className="mt-2 text-3xl font-bold text-red-300">
+              {stats.overdue}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Past due and not completed
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">
+              Due Today
+            </p>
+
+            <p className="mt-2 text-3xl font-bold text-amber-300">
+              {stats.dueToday}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">Needs attention today</p>
+          </div>
+
+          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-cyan-400">
+              Next 7 Days
+            </p>
+
+            <p className="mt-2 text-3xl font-bold text-cyan-300">
+              {stats.dueNextSevenDays}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Due today through seven days ahead
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              No Due Date
+            </p>
+
+            <p className="mt-2 text-3xl font-bold text-slate-300">
+              {stats.noDueDate}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Issues without a deadline
+            </p>
+          </div>
+        </div>
+
+        {stats.overdue > 0 && (
+          <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-sm font-medium text-red-300">
+              {stats.overdue}{" "}
+              {stats.overdue === 1
+                ? "unfinished issue is"
+                : "unfinished issues are"}{" "}
+              currently overdue.
+            </p>
+
+            <p className="mt-1 text-xs text-red-200/60">
+              Use the Deadline filter to isolate overdue work.
+            </p>
+          </div>
+        )}
+      </article>
 
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
         <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
