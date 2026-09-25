@@ -160,10 +160,11 @@ function KanbanBoard({
       }}
       onDragCancel={handleDragCancel}
     >
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
         <KanbanColumn
-          title="To Do"
+          title="To do"
           status="TODO"
+          accent="slate"
           issues={getIssuesByStatus("TODO")}
           activities={activities}
           onCommentsIssue={onCommentsIssue}
@@ -173,8 +174,9 @@ function KanbanBoard({
         />
 
         <KanbanColumn
-          title="In Progress"
+          title="In progress"
           status="IN_PROGRESS"
+          accent="violet"
           issues={getIssuesByStatus("IN_PROGRESS")}
           activities={activities}
           onCommentsIssue={onCommentsIssue}
@@ -186,6 +188,7 @@ function KanbanBoard({
         <KanbanColumn
           title="Done"
           status="DONE"
+          accent="emerald"
           issues={getIssuesByStatus("DONE")}
           activities={activities}
           onCommentsIssue={onCommentsIssue}
@@ -197,7 +200,7 @@ function KanbanBoard({
 
       <DragOverlay>
         {activeIssue ? (
-          <div className="w-[320px]">
+          <div className="w-[290px] rotate-1 opacity-95 shadow-2xl shadow-black/40">
             <IssueCard
               issue={activeIssue}
               activities={[]}

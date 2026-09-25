@@ -11,19 +11,13 @@ function AppLayout() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-[18%] top-[-14rem] h-[30rem] w-[30rem] rounded-full bg-cyan-500/[0.035] blur-3xl" />
-
-        <div className="absolute bottom-[-15rem] right-[-10rem] h-[32rem] w-[32rem] rounded-full bg-blue-500/[0.035] blur-3xl" />
-      </div>
-
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="relative min-h-screen lg:pl-72">
+      <div className="min-h-screen lg:pl-60">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
 
-        <main className="min-h-[calc(100vh-5rem)]">
-          <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="min-h-[calc(100vh-4rem)] bg-slate-950">
+          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-5 lg:px-6">
             <Outlet />
           </div>
         </main>

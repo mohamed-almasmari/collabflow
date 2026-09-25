@@ -28,7 +28,9 @@ import {
 } from "../../api/workspaces";
 
 import ActivityTimeline from "../../components/Activity/ActivityTimeline";
+
 import CommentsPanel from "../../components/Comments/CommentsPanel";
+
 import BoardActions from "../../components/Kanban/BoardActions";
 
 import BoardFilters, {
@@ -39,10 +41,15 @@ import BoardFilters, {
 } from "../../components/Kanban/BoardFilters";
 
 import BoardStats from "../../components/Kanban/BoardStats";
+
 import CreateIssueForm from "../../components/Kanban/CreateIssueForm";
+
 import EditIssueForm from "../../components/Kanban/EditIssueForm";
+
 import KanbanBoard from "../../components/Kanban/KanbanBoard";
+
 import LabelManager from "../../components/Kanban/LabelManager";
+
 import ProjectPresence from "../../components/Kanban/ProjectPresence";
 
 import { useAuth } from "../../hooks/useAuth";
@@ -238,14 +245,17 @@ function ProjectBoardPage() {
           switch (dueDateFilter) {
             case "OVERDUE":
               matchesDueDate = issue.status !== "DONE" && difference < 0;
+
               break;
 
             case "TODAY":
               matchesDueDate = difference === 0;
+
               break;
 
             case "NEXT_7_DAYS":
               matchesDueDate = difference >= 0 && difference <= 7;
+
               break;
 
             default:
@@ -462,7 +472,6 @@ function ProjectBoardPage() {
 
     function belongsToCurrentProject(payload: {
       workspaceId: string;
-
       projectId: string;
     }) {
       return (
@@ -503,9 +512,7 @@ function ProjectBoardPage() {
 
     function handlePresenceUpdated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       users: PresenceUser[];
     }) {
       if (belongsToCurrentProject(payload)) {
@@ -515,15 +522,10 @@ function ProjectBoardPage() {
 
     function handleIssueActivity(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
-
       activity: IssueActivityType;
-
       active: boolean;
-
       user: PresenceUser;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -559,9 +561,7 @@ function ProjectBoardPage() {
 
     function handleIssueCreated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -575,9 +575,7 @@ function ProjectBoardPage() {
 
     function handleIssueUpdated(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -595,9 +593,7 @@ function ProjectBoardPage() {
 
     function handleIssueMoved(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issue: Issue;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -611,9 +607,7 @@ function ProjectBoardPage() {
 
     function handleIssueDeleted(payload: {
       workspaceId: string;
-
       projectId: string;
-
       issueId: string;
     }) {
       if (!belongsToCurrentProject(payload)) {
@@ -693,13 +687,7 @@ function ProjectBoardPage() {
     setSearchParams,
   ]);
 
-  function setQueryParameter(
-    key: string,
-
-    value: string,
-
-    defaultValue: string,
-  ) {
+  function setQueryParameter(key: string, value: string, defaultValue: string) {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
 
@@ -734,7 +722,6 @@ function ProjectBoardPage() {
 
   function emitIssueEvent(
     event: "issue:created" | "issue:updated" | "issue:moved" | "issue:deleted",
-
     issueId: string,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -754,9 +741,7 @@ function ProjectBoardPage() {
 
   function emitIssueActivity(
     issueId: string,
-
     activity: IssueActivityType,
-
     active: boolean,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -797,11 +782,7 @@ function ProjectBoardPage() {
     void loadActivity();
   }
 
-  async function handleUpdateIssue(
-    issueId: string,
-
-    input: UpdateIssueInput,
-  ) {
+  async function handleUpdateIssue(issueId: string, input: UpdateIssueInput) {
     if (!workspaceId || !projectId || !accessToken || !editingIssue) {
       throw new Error("Unable to update issue");
     }
@@ -838,9 +819,7 @@ function ProjectBoardPage() {
 
   async function handleMoveIssue(
     issueId: string,
-
     status: IssueStatus,
-
     position: number,
   ) {
     if (!workspaceId || !projectId || !accessToken) {
@@ -922,134 +901,170 @@ function ProjectBoardPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 p-8 text-slate-300">
-        Loading board...
-      </main>
+      <div className="space-y-4">
+        <div className="h-6 w-40 animate-pulse rounded bg-slate-800" />
+
+        <div className="h-10 animate-pulse rounded-lg bg-slate-900" />
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <div
+              key={item}
+              className="h-96 animate-pulse rounded-xl bg-slate-900"
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-5">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-cyan-400">
+    <div className="space-y-4">
+      <header className="border-b border-slate-800 pb-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="font-medium text-cyan-400">
                 {workspace?.name ?? "Workspace"}
-              </p>
+              </span>
 
-              <h1 className="mt-2 text-3xl font-bold text-white">
-                {project?.name ?? "Project Board"}
-              </h1>
+              <span className="text-slate-700">/</span>
 
-              <p className="mt-2 text-slate-400">
-                {project?.description ??
-                  "Track and collaborate on project issues."}
-              </p>
+              <span className="text-slate-500">Board</span>
 
-              <div className="mt-4 flex flex-wrap items-center gap-4">
-                <span className="text-sm text-slate-500">
-                  {members.length} {members.length === 1 ? "member" : "members"}
-                </span>
+              {project?.status === "ARCHIVED" && (
+                <>
+                  <span className="text-slate-700">•</span>
 
-                <span className="text-sm text-slate-500">
-                  {issues.length} {issues.length === 1 ? "issue" : "issues"}
-                </span>
+                  <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-slate-500">
+                    Archived
+                  </span>
+                </>
+              )}
+            </div>
+
+            <h1 className="truncate text-xl font-semibold tracking-tight text-white">
+              {project?.name ?? "Project Board"}
+            </h1>
+
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+              {project?.description ??
+                "Track and collaborate on project issues."}
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px]">
+              <span className="text-slate-500">
+                <span className="font-semibold text-slate-300">
+                  {members.length}
+                </span>{" "}
+                {members.length === 1 ? "member" : "members"}
+              </span>
+
+              <span className="text-slate-500">
+                <span className="font-semibold text-slate-300">
+                  {issues.length}
+                </span>{" "}
+                {issues.length === 1 ? "issue" : "issues"}
+              </span>
+
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    realtimeConnected ? "bg-emerald-400" : "bg-amber-400"
+                  }`}
+                />
 
                 <span
                   className={
-                    realtimeConnected
-                      ? "text-sm text-emerald-400"
-                      : "text-sm text-amber-400"
+                    realtimeConnected ? "text-emerald-400" : "text-amber-400"
                   }
                 >
-                  {realtimeConnected
-                    ? "Real-time connected"
-                    : "Real-time disconnected"}
+                  {realtimeConnected ? "Realtime" : "Disconnected"}
                 </span>
-              </div>
-
-              <div className="mt-4">
-                <ProjectPresence users={presenceUsers} />
-              </div>
+              </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowCreateForm(true)}
-              disabled={project?.status === "ARCHIVED"}
-              className="rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              New Issue
-            </button>
+            {presenceUsers.length > 0 && (
+              <div className="mt-3">
+                <ProjectPresence users={presenceUsers} />
+              </div>
+            )}
           </div>
-        </header>
 
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-900 bg-red-950/40 p-3 text-red-300">
-            {error}
-          </div>
-        )}
+          <button
+            type="button"
+            onClick={() => setShowCreateForm(true)}
+            disabled={project?.status === "ARCHIVED"}
+            className="inline-flex items-center gap-1.5 self-start rounded-lg bg-blue-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-600 xl:self-auto"
+          >
+            <span className="text-sm leading-none">+</span>
+            New issue
+          </button>
+        </div>
+      </header>
 
-        <BoardStats issues={issues} />
+      {error && (
+        <div className="rounded-lg border border-rose-900/60 bg-rose-950/30 px-3 py-2.5 text-xs text-rose-300">
+          {error}
+        </div>
+      )}
 
-        {workspaceId && projectId && accessToken && (
-          <LabelManager
-            workspaceId={workspaceId}
-            projectId={projectId}
-            accessToken={accessToken}
-            labels={labels}
-            canManage={canManageLabels}
-            onCreated={(label) =>
-              setLabels((current) =>
-                [...current, label].sort((first, second) =>
-                  first.name.localeCompare(second.name),
-                ),
-              )
-            }
-          />
-        )}
+      <BoardStats issues={issues} />
 
-        {showCreateForm && (
-          <div className="mb-6">
-            <CreateIssueForm
-              members={members}
-              labels={labels}
-              onCreate={handleCreateIssue}
-              onCancel={() => setShowCreateForm(false)}
-            />
-          </div>
-        )}
+      {workspaceId && projectId && accessToken && (
+        <LabelManager
+          workspaceId={workspaceId}
+          projectId={projectId}
+          accessToken={accessToken}
+          labels={labels}
+          canManage={canManageLabels}
+          onCreated={(label) =>
+            setLabels((current) =>
+              [...current, label].sort((first, second) =>
+                first.name.localeCompare(second.name),
+              ),
+            )
+          }
+        />
+      )}
 
-        {editingIssue && (
-          <div className="mb-6">
-            <EditIssueForm
-              key={`${editingIssue.id}-${editingIssue.updatedAt}`}
-              issue={editingIssue}
-              members={members}
-              labels={labels}
-              onSave={handleUpdateIssue}
-              onCancel={() => {
-                emitIssueActivity(editingIssue.id, "EDITING", false);
+      {showCreateForm && (
+        <CreateIssueForm
+          members={members}
+          labels={labels}
+          onCreate={handleCreateIssue}
+          onCancel={() => setShowCreateForm(false)}
+        />
+      )}
 
-                setEditingIssue(null);
-              }}
-            />
-          </div>
-        )}
+      {editingIssue && (
+        <EditIssueForm
+          key={`${editingIssue.id}-${editingIssue.updatedAt}`}
+          issue={editingIssue}
+          members={members}
+          labels={labels}
+          onSave={handleUpdateIssue}
+          onCancel={() => {
+            emitIssueActivity(editingIssue.id, "EDITING", false);
 
-        {discussionIssue && workspaceId && projectId && accessToken && (
-          <CommentsPanel
-            workspaceId={workspaceId}
-            projectId={projectId}
-            issue={discussionIssue}
-            accessToken={accessToken}
-            currentUserId={user?.id ?? null}
-            currentUserRole={currentMembership?.role ?? null}
-            onClose={handleCloseComments}
-          />
-        )}
+            setEditingIssue(null);
+          }}
+        />
+      )}
 
+      {discussionIssue && workspaceId && projectId && accessToken && (
+        <CommentsPanel
+          workspaceId={workspaceId}
+          projectId={projectId}
+          issue={discussionIssue}
+          accessToken={accessToken}
+          currentUserId={user?.id ?? null}
+          currentUserRole={currentMembership?.role ?? null}
+          onClose={handleCloseComments}
+        />
+      )}
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/35 p-3">
         <BoardFilters
           searchText={searchText}
           statusFilter={statusFilter}
@@ -1079,13 +1094,17 @@ function ProjectBoardPage() {
           }
           onClear={handleClearFilters}
         />
+      </div>
 
+      <div className="flex justify-end">
         <BoardActions
           issues={filteredIssues}
           projectName={project?.name ?? "CollabFlow Project"}
         />
+      </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0">
           <KanbanBoard
             issues={filteredIssues}
             activities={issueActivities}
@@ -1101,52 +1120,67 @@ function ProjectBoardPage() {
               emitIssueActivity(issueId, "DRAGGING", active)
             }
           />
-
-          <ActivityTimeline
-            activities={activities}
-            loading={activityLoading}
-            onRefresh={loadActivity}
-          />
         </div>
 
-        {deletingIssue && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-            <div className="w-full max-w-md rounded-2xl border border-red-900 bg-slate-900 p-6">
-              <h2 className="text-xl font-semibold text-white">Delete Issue</h2>
+        <ActivityTimeline
+          activities={activities}
+          loading={activityLoading}
+          onRefresh={loadActivity}
+        />
+      </div>
 
-              <p className="mt-3 text-slate-400">
+      {deletingIssue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/40">
+            <div className="border-b border-slate-800 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-rose-400" />
+
+                <h2 className="text-sm font-semibold text-white">
+                  Delete issue
+                </h2>
+              </div>
+            </div>
+
+            <div className="px-5 py-4">
+              <p className="text-sm leading-6 text-slate-400">
                 Delete{" "}
-                <span className="font-semibold text-white">
+                <span className="font-medium text-white">
                   {deletingIssue.title}
                 </span>
                 ?
               </p>
 
-              <div className="mt-6 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeletingIssue(null)}
-                  className="rounded-lg border border-slate-700 px-4 py-2 text-slate-300"
-                >
-                  Cancel
-                </button>
+              <p className="mt-1 text-xs text-slate-600">
+                This action cannot be undone.
+              </p>
+            </div>
 
-                <button
-                  type="button"
-                  disabled={deleting}
-                  onClick={() => {
-                    void handleDeleteIssue();
-                  }}
-                  className="rounded-lg bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-50"
-                >
-                  {deleting ? "Deleting..." : "Delete"}
-                </button>
-              </div>
+            <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setDeletingIssue(null)}
+                disabled={deleting}
+                className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => {
+                  void handleDeleteIssue();
+                }}
+                className="rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-400 disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete issue"}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </main>
+        </div>
+      )}
+    </div>
   );
 }
 

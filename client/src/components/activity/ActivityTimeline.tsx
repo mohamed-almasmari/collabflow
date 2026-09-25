@@ -2,9 +2,7 @@ import type { ActivityLog } from "../../api/activity";
 
 interface ActivityTimelineProps {
   activities: ActivityLog[];
-
   loading: boolean;
-
   onRefresh: () => Promise<void>;
 }
 
@@ -56,10 +54,10 @@ function getActionStyle(action: ActivityLog["action"]) {
       return "bg-cyan-400";
 
     case "MOVED":
-      return "bg-amber-400";
+      return "bg-violet-400";
 
     case "DELETED":
-      return "bg-red-400";
+      return "bg-rose-400";
   }
 }
 
@@ -81,12 +79,12 @@ function ActivityTimeline({
   onRefresh,
 }: ActivityTimelineProps) {
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/60">
-      <header className="flex items-center justify-between border-b border-slate-800 p-5">
+    <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/35">
+      <header className="flex h-11 items-center justify-between border-b border-slate-800 px-3">
         <div>
-          <h2 className="font-semibold text-white">Activity</h2>
+          <h2 className="text-xs font-semibold text-slate-300">Activity</h2>
 
-          <p className="mt-1 text-sm text-slate-500">Recent project changes</p>
+          <p className="text-[9px] text-slate-700">Recent changes</p>
         </div>
 
         <button
@@ -95,37 +93,39 @@ function ActivityTimeline({
           onClick={() => {
             void onRefresh();
           }}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md px-2 py-1 text-[10px] font-medium text-slate-500 transition hover:bg-slate-800 hover:text-slate-300 disabled:opacity-50"
         >
-          {loading ? "Refreshing..." : "Refresh"}
+          {loading ? "..." : "Refresh"}
         </button>
       </header>
 
-      <div className="max-h-[600px] overflow-y-auto p-5">
+      <div className="max-h-[520px] overflow-y-auto p-3">
         {loading && activities.length === 0 ? (
-          <p className="text-sm text-slate-500">Loading activity...</p>
+          <p className="py-6 text-center text-[11px] text-slate-600">
+            Loading activity...
+          </p>
         ) : activities.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center">
-            <p className="text-sm text-slate-500">No activity yet.</p>
+          <div className="rounded-lg border border-dashed border-slate-800 py-8 text-center">
+            <p className="text-[11px] text-slate-600">No activity yet</p>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {activities.map((activity) => (
-              <article key={activity.id} className="relative pl-6">
+              <article key={activity.id} className="relative pl-4">
                 <span
-                  className={`absolute left-0 top-2 h-2.5 w-2.5 rounded-full ${getActionStyle(
+                  className={`absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full ${getActionStyle(
                     activity.action,
                   )}`}
                 />
 
-                <p className="text-sm leading-6 text-slate-300">
-                  <span className="font-semibold text-white">
+                <p className="text-[11px] leading-5 text-slate-500">
+                  <span className="font-medium text-slate-300">
                     {activity.actor.name}
                   </span>{" "}
                   {getActivityText(activity)}
                 </p>
 
-                <time className="mt-1 block text-xs text-slate-500">
+                <time className="mt-0.5 block text-[9px] text-slate-700">
                   {formatDate(activity.createdAt)}
                 </time>
               </article>

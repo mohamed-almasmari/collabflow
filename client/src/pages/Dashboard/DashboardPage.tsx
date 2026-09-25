@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import {
   createProject,
@@ -24,18 +24,29 @@ import {
   type WorkspaceSummary,
 } from "../../api/workspaces";
 
-import CreateProjectForm from "../../pages/Dashboard/CreateProjectForm";
-import CreateWorkspaceForm from "../../pages/Dashboard/CreateWorkspaceForm";
-import WorkspaceMembersPanel from "../../pages/Dashboard/WorkspaceMembersPanel";
+import CreateProjectForm from "./CreateProjectForm";
+import CreateWorkspaceForm from "./CreateWorkspaceForm";
+import WorkspaceMembersPanel from "./WorkspaceMembersPanel";
 
 import { useAuth } from "../../hooks/useAuth";
+
+const projectColors = [
+  "bg-cyan-400",
+  "bg-violet-400",
+  "bg-emerald-400",
+  "bg-amber-400",
+  "bg-rose-400",
+  "bg-blue-400",
+];
 
 function DashboardPage() {
   const navigate = useNavigate();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const { accessToken } = useAuth();
 
-  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const requestedWorkspaceId = searchParams.get("workspace");
 
   const [selectedWorkspace, setSelectedWorkspace] =
     useState<WorkspaceSummary | null>(null);
@@ -63,20 +74,24 @@ function DashboardPage() {
   async function loadWorkspaces(token: string) {
     const data = await getWorkspaces(token);
 
-    setWorkspaces(data);
+    const requested = requestedWorkspaceId
+      ? data.find((workspace) => workspace.id === requestedWorkspaceId)
+      : undefined;
 
-    setSelectedWorkspace((currentWorkspace) => {
-      if (
-        currentWorkspace &&
-        data.some((workspace) => workspace.id === currentWorkspace.id)
-      ) {
-        return (
-          data.find((workspace) => workspace.id === currentWorkspace.id) ?? null
-        );
-      }
+    const nextWorkspace = requested ?? data[0] ?? null;
 
-      return data[0] ?? null;
-    });
+    setSelectedWorkspace(nextWorkspace);
+
+    if (nextWorkspace && nextWorkspace.id !== requestedWorkspaceId) {
+      setSearchParams(
+        {
+          workspace: nextWorkspace.id,
+        },
+        {
+          replace: true,
+        },
+      );
+    }
   }
 
   async function loadProjects(workspaceId: string, token: string) {
@@ -105,6 +120,7 @@ function DashboardPage() {
     async function loadDashboard() {
       try {
         setLoadingWorkspaces(true);
+
         setError(null);
 
         const data = await getWorkspaces(currentAccessToken);
@@ -113,14 +129,29 @@ function DashboardPage() {
           return;
         }
 
-        setWorkspaces(data);
+        const requested = requestedWorkspaceId
+          ? data.find((workspace) => workspace.id === requestedWorkspaceId)
+          : undefined;
 
-        setSelectedWorkspace(data[0] ?? null);
-      } catch (error) {
+        const nextWorkspace = requested ?? data[0] ?? null;
+
+        setSelectedWorkspace(nextWorkspace);
+
+        if (nextWorkspace && nextWorkspace.id !== requestedWorkspaceId) {
+          setSearchParams(
+            {
+              workspace: nextWorkspace.id,
+            },
+            {
+              replace: true,
+            },
+          );
+        }
+      } catch (loadError) {
         if (!cancelled) {
           setError(
-            error instanceof Error
-              ? error.message
+            loadError instanceof Error
+              ? loadError.message
               : "Unable to load workspaces",
           );
         }
@@ -136,11 +167,12 @@ function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, requestedWorkspaceId, setSearchParams]);
 
   useEffect(() => {
     if (!selectedWorkspace || !accessToken) {
       setProjects([]);
+
       setWorkspaceDetails(null);
 
       return;
@@ -166,15 +198,19 @@ function DashboardPage() {
           getWorkspaceById(workspaceId, currentAccessToken),
         ]);
 
-        if (!cancelled) {
-          setProjects(projectData);
-
-          setWorkspaceDetails(workspaceData);
+        if (cancelled) {
+          return;
         }
-      } catch (error) {
+
+        setProjects(projectData);
+
+        setWorkspaceDetails(workspaceData);
+      } catch (loadError) {
         if (!cancelled) {
           setError(
-            error instanceof Error ? error.message : "Unable to load workspace",
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load workspace",
           );
         }
       } finally {
@@ -198,9 +234,13 @@ function DashboardPage() {
       throw new Error("Authentication required");
     }
 
-    await createWorkspace(input, accessToken);
+    const created = await createWorkspace(input, accessToken);
 
     await loadWorkspaces(accessToken);
+
+    setSearchParams({
+      workspace: created.id,
+    });
 
     setShowWorkspaceForm(false);
   }
@@ -257,14 +297,6 @@ function DashboardPage() {
     await loadWorkspaceDetails(selectedWorkspace.id, accessToken);
   }
 
-  function handleSelectWorkspace(workspace: WorkspaceSummary) {
-    setSelectedWorkspace(workspace);
-
-    setShowProjectForm(false);
-    setShowMembersPanel(false);
-    setError(null);
-  }
-
   function handleOpenProject(project: Project) {
     if (!selectedWorkspace) {
       return;
@@ -277,270 +309,315 @@ function DashboardPage() {
 
   function handleStartWorkspaceCreation() {
     setShowProjectForm(false);
+
     setShowMembersPanel(false);
+
     setShowWorkspaceForm(true);
+
     setError(null);
   }
 
   function handleStartProjectCreation() {
     setShowWorkspaceForm(false);
+
     setShowMembersPanel(false);
+
     setShowProjectForm(true);
+
     setError(null);
   }
 
   function handleStartMemberManagement() {
     setShowWorkspaceForm(false);
+
     setShowProjectForm(false);
+
     setShowMembersPanel(true);
+
     setError(null);
   }
 
   if (loadingWorkspaces) {
     return (
-      <main className="min-h-screen bg-slate-950 p-8">
-        <p className="text-slate-300">Loading dashboard...</p>
-      </main>
+      <div className="space-y-5">
+        <div className="h-7 w-44 animate-pulse rounded bg-slate-800" />
+
+        <div className="h-40 animate-pulse rounded-lg bg-slate-900/60" />
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <div
+              key={item}
+              className="h-40 animate-pulse rounded-lg bg-slate-900/60"
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
+  const activeProjects = projects.filter(
+    (project) => project.status === "ACTIVE",
+  ).length;
+
+  const canCreateProject =
+    selectedWorkspace?.role === "OWNER" || selectedWorkspace?.role === "ADMIN";
+
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-8 text-white">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
-              CollabFlow
-            </p>
+    <div className="mx-auto max-w-6xl">
+      <header className="flex flex-col gap-3 border-b border-slate-800/70 pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-100">
+            Dashboard
+          </h1>
 
-            <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="mt-1 text-xs text-slate-500">
+            Manage your projects and workspace activity.
+          </p>
+        </div>
 
-            <p className="mt-2 text-slate-400">
-              Manage your workspaces, projects, and team.
-            </p>
-          </div>
+        <button
+          type="button"
+          onClick={handleStartWorkspaceCreation}
+          className="inline-flex items-center gap-1.5 self-start rounded-md bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-cyan-300"
+        >
+          <span className="text-sm leading-none">+</span>
+          New workspace
+        </button>
+      </header>
 
-          <button
-            type="button"
-            onClick={handleStartWorkspaceCreation}
-            className="self-start rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 sm:self-auto"
-          >
-            New Workspace
-          </button>
-        </header>
+      {error && (
+        <div className="mt-4 rounded-md border border-rose-900/60 bg-rose-950/30 px-3 py-2.5 text-xs text-rose-300">
+          {error}
+        </div>
+      )}
 
-        {error && (
-          <div className="mb-6 rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300">
-            {error}
-          </div>
-        )}
-
+      <div className="mt-5 space-y-5">
         {showWorkspaceForm && (
-          <div className="mb-6">
-            <CreateWorkspaceForm
-              onCreate={handleCreateWorkspace}
-              onCancel={() => setShowWorkspaceForm(false)}
-            />
-          </div>
+          <CreateWorkspaceForm
+            onCreate={handleCreateWorkspace}
+            onCancel={() => setShowWorkspaceForm(false)}
+          />
         )}
 
         {showProjectForm && selectedWorkspace && (
-          <div className="mb-6">
-            <CreateProjectForm
-              onCreate={handleCreateProject}
-              onCancel={() => setShowProjectForm(false)}
-            />
-          </div>
+          <CreateProjectForm
+            onCreate={handleCreateProject}
+            onCancel={() => setShowProjectForm(false)}
+          />
         )}
 
         {showMembersPanel && workspaceDetails && (
-          <div className="mb-6">
-            <WorkspaceMembersPanel
-              workspace={workspaceDetails}
-              onAddMember={handleAddMember}
-              onUpdateMember={handleUpdateMember}
-              onRemoveMember={handleRemoveMember}
-              onClose={() => setShowMembersPanel(false)}
-            />
-          </div>
+          <WorkspaceMembersPanel
+            workspace={workspaceDetails}
+            onAddMember={handleAddMember}
+            onUpdateMember={handleUpdateMember}
+            onRemoveMember={handleRemoveMember}
+            onClose={() => setShowMembersPanel(false)}
+          />
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <aside className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold">Workspaces</h2>
-
-              <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-400">
-                {workspaces.length}
-              </span>
-            </div>
-
-            {workspaces.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center">
-                <p className="text-sm text-slate-500">No workspaces yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {workspaces.map((workspace) => {
-                  const active = selectedWorkspace?.id === workspace.id;
-
-                  return (
-                    <button
-                      key={workspace.id}
-                      type="button"
-                      onClick={() => handleSelectWorkspace(workspace)}
-                      className={`
-                          w-full rounded-xl border p-3 text-left transition
-                          ${
-                            active
-                              ? "border-cyan-500 bg-cyan-500/10"
-                              : "border-slate-800 bg-slate-900 hover:border-slate-700"
-                          }
-                        `}
-                    >
-                      <p className="truncate font-medium text-white">
-                        {workspace.name}
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        {workspace.role}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </aside>
-
-          <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-            {selectedWorkspace ? (
-              <>
-                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-cyan-400">
-                      Workspace
-                    </p>
-
-                    <h2 className="mt-1 text-2xl font-bold">
+        {selectedWorkspace ? (
+          <>
+            <section className="rounded-lg border border-slate-800 bg-slate-900/35">
+              <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="truncate text-lg font-semibold text-white">
                       {selectedWorkspace.name}
                     </h2>
 
-                    <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                      {selectedWorkspace.description ??
-                        "No workspace description."}
-                    </p>
-
-                    {workspaceDetails && (
-                      <p className="mt-3 text-sm text-slate-500">
-                        {workspaceDetails.members.length}{" "}
-                        {workspaceDetails.members.length === 1
-                          ? "member"
-                          : "members"}
-                      </p>
-                    )}
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                        selectedWorkspace.role === "OWNER"
+                          ? "bg-violet-500/10 text-violet-300"
+                          : selectedWorkspace.role === "ADMIN"
+                            ? "bg-cyan-500/10 text-cyan-300"
+                            : "bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      {selectedWorkspace.role}
+                    </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleStartMemberManagement}
-                      disabled={loadingWorkspaceDetails}
-                      className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
-                    >
-                      Manage Members
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleStartProjectCreation}
-                      disabled={selectedWorkspace.role === "MEMBER"}
-                      className="rounded-lg border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-600"
-                    >
-                      New Project
-                    </button>
-                  </div>
-                </header>
-
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-200">Projects</h3>
-
-                  <span className="text-sm text-slate-500">
-                    {projects.length}{" "}
-                    {projects.length === 1 ? "project" : "projects"}
-                  </span>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                    {selectedWorkspace.description ?? "No description"}
+                  </p>
                 </div>
 
-                {loadingProjects ? (
-                  <p className="text-sm text-slate-400">Loading projects...</p>
-                ) : projects.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-700 p-10 text-center">
-                    <p className="font-medium text-slate-300">
-                      No projects yet
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleStartMemberManagement}
+                    disabled={loadingWorkspaceDetails}
+                    className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-600 hover:text-white disabled:opacity-50"
+                  >
+                    Members
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleStartProjectCreation}
+                    disabled={!canCreateProject}
+                    className="rounded-md bg-blue-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-600"
+                  >
+                    + New project
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-x-8 gap-y-3 border-t border-slate-800/70 px-4 py-3">
+                <div>
+                  <p className="text-[9px] uppercase tracking-wide text-slate-600">
+                    Projects
+                  </p>
+
+                  <p className="mt-0.5 text-sm font-semibold text-slate-200">
+                    {projects.length}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[9px] uppercase tracking-wide text-slate-600">
+                    Active
+                  </p>
+
+                  <p className="mt-0.5 text-sm font-semibold text-emerald-400">
+                    {activeProjects}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[9px] uppercase tracking-wide text-slate-600">
+                    Members
+                  </p>
+
+                  <p className="mt-0.5 text-sm font-semibold text-slate-200">
+                    {workspaceDetails?.members.length ?? "—"}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200">
+                    Projects
+                  </h3>
+
+                  <p className="mt-0.5 text-[10px] text-slate-600">
+                    Open a project to view its board.
+                  </p>
+                </div>
+
+                <span className="text-[10px] text-slate-700">
+                  {projects.length} total
+                </span>
+              </div>
+
+              {loadingProjects ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {[1, 2, 3].map((item) => (
+                    <div
+                      key={item}
+                      className="h-40 animate-pulse rounded-lg bg-slate-900"
+                    />
+                  ))}
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="rounded-lg border border-slate-800 bg-slate-900/25 px-6 py-10">
+                  <div className="mx-auto max-w-sm text-center">
+                    <p className="text-sm font-medium text-slate-300">
+                      No projects in this workspace
                     </p>
 
-                    <p className="mt-2 text-sm text-slate-500">
-                      Create the first project in this workspace.
+                    <p className="mt-1 text-xs leading-5 text-slate-600">
+                      {canCreateProject
+                        ? "Create the first project and start organizing work."
+                        : "An owner or admin can create projects for this workspace."}
                     </p>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {projects.map((project) => (
-                      <article
-                        key={project.id}
-                        className="rounded-xl border border-slate-800 bg-slate-900 p-5 transition hover:border-slate-700"
+
+                    {canCreateProject && (
+                      <button
+                        type="button"
+                        onClick={handleStartProjectCreation}
+                        className="mt-4 rounded-md bg-blue-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-400"
                       >
-                        <div className="mb-4 flex items-start justify-between gap-3">
-                          <h3 className="font-semibold text-white">
+                        Create project
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {projects.map((project, index) => (
+                    <button
+                      key={project.id}
+                      type="button"
+                      onClick={() => handleOpenProject(project)}
+                      className="group overflow-hidden rounded-lg border border-slate-800 bg-slate-900/45 text-left transition hover:border-slate-700 hover:bg-slate-900/70"
+                    >
+                      <div
+                        className={`h-1 ${
+                          projectColors[index % projectColors.length]
+                        }`}
+                      />
+
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <h4 className="truncate text-sm font-semibold text-slate-100">
                             {project.name}
-                          </h3>
+                          </h4>
 
                           <span
-                            className={`
-                                rounded-full border px-2.5 py-1 text-[11px] font-semibold
-                                ${
-                                  project.status === "ACTIVE"
-                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                    : "border-slate-600 bg-slate-800 text-slate-400"
-                                }
-                              `}
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                              project.status === "ACTIVE"
+                                ? "bg-emerald-500/10 text-emerald-400"
+                                : "bg-slate-800 text-slate-500"
+                            }`}
                           >
                             {project.status}
                           </span>
                         </div>
 
-                        <p className="min-h-12 text-sm leading-6 text-slate-400">
+                        <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-slate-500">
                           {project.description ?? "No project description."}
                         </p>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenProject(project)}
-                          className="mt-5 w-full rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
-                        >
-                          Open Board
-                        </button>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex min-h-72 items-center justify-center">
-                <div className="text-center">
-                  <p className="font-medium text-slate-300">
-                    No workspace selected
-                  </p>
-
-                  <p className="mt-2 text-sm text-slate-500">
-                    Create or select a workspace to continue.
-                  </p>
+                        <div className="mt-4 border-t border-slate-800/70 pt-3">
+                          <span className="text-[10px] font-medium text-cyan-400 transition group-hover:text-cyan-300">
+                            Open board →
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </div>
-            )}
+              )}
+            </section>
+          </>
+        ) : (
+          <section className="rounded-lg border border-slate-800 bg-slate-900/25 px-6 py-12 text-center">
+            <p className="text-sm font-medium text-slate-300">
+              No workspace available
+            </p>
+
+            <p className="mt-1 text-xs text-slate-600">
+              Create a workspace to start organizing projects.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleStartWorkspaceCreation}
+              className="mt-4 rounded-md bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              Create workspace
+            </button>
           </section>
-        </div>
+        )}
       </div>
-    </main>
+    </div>
   );
 }
 

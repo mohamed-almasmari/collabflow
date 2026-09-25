@@ -6,7 +6,6 @@ import { exportIssuesToCsv } from "../../utils/exportIssuesCsv";
 
 interface BoardActionsProps {
   issues: Issue[];
-
   projectName: string;
 }
 
@@ -38,40 +37,31 @@ function BoardActions({ issues, projectName }: BoardActionsProps) {
   }
 
   return (
-    <section className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 className="text-sm font-semibold text-white">Board Actions</h2>
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          void handleCopyViewLink();
+        }}
+        className="rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 text-[11px] font-medium text-slate-400 transition hover:border-slate-700 hover:text-white"
+      >
+        {copyState === "copied"
+          ? "Copied"
+          : copyState === "error"
+            ? "Copy failed"
+            : "Copy link"}
+      </button>
 
-        <p className="mt-1 text-xs text-slate-500">
-          Share this exact board view or export the visible issues.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            void handleCopyViewLink();
-          }}
-          className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-cyan-500/50 hover:bg-slate-800 hover:text-white"
-        >
-          {copyState === "copied"
-            ? "Link Copied"
-            : copyState === "error"
-              ? "Copy Failed"
-              : "Copy View Link"}
-        </button>
-
-        <button
-          type="button"
-          onClick={handleExport}
-          disabled={issues.length === 0}
-          className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Export CSV ({issues.length})
-        </button>
-      </div>
-    </section>
+      <button
+        type="button"
+        onClick={handleExport}
+        disabled={issues.length === 0}
+        className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11px] font-medium text-cyan-300 transition hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Export CSV
+        <span className="ml-1 text-cyan-500">{issues.length}</span>
+      </button>
+    </div>
   );
 }
 

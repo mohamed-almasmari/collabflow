@@ -19,27 +19,47 @@ interface IssueCardProps {
 
   onDelete: (issue: Issue) => void;
 
-  onDragActivity: (
-    issueId: string,
-
-    active: boolean,
-  ) => void;
+  onDragActivity: (issueId: string, active: boolean) => void;
 }
 
-function getPriorityClasses(priority: Issue["priority"]) {
+function getPriorityStyles(priority: Issue["priority"]) {
   switch (priority) {
     case "URGENT":
-      return "border-red-500/30 bg-red-500/10 text-red-300";
+      return {
+        dot: "bg-rose-400",
+
+        text: "text-rose-300",
+
+        background: "bg-rose-500/10",
+      };
 
     case "HIGH":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+      return {
+        dot: "bg-orange-400",
+
+        text: "text-orange-300",
+
+        background: "bg-orange-500/10",
+      };
 
     case "MEDIUM":
-      return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300";
+      return {
+        dot: "bg-amber-400",
+
+        text: "text-amber-300",
+
+        background: "bg-amber-500/10",
+      };
 
     case "LOW":
     default:
-      return "border-slate-600 bg-slate-800 text-slate-300";
+      return {
+        dot: "bg-blue-400",
+
+        text: "text-blue-300",
+
+        background: "bg-blue-500/10",
+      };
   }
 }
 
@@ -83,17 +103,17 @@ function getDueDateInfo(issue: Issue) {
 
   if (issue.status === "DONE") {
     return {
-      label: `Due ${formatted}`,
+      label: formatted,
 
-      className: "border-slate-700 bg-slate-800 text-slate-400",
+      className: "text-slate-600",
     };
   }
 
   if (differenceDays < 0) {
     return {
-      label: `Overdue · ${formatted}`,
+      label: `Overdue ${formatted}`,
 
-      className: "border-red-500/30 bg-red-500/10 text-red-300",
+      className: "text-rose-400",
     };
   }
 
@@ -101,7 +121,7 @@ function getDueDateInfo(issue: Issue) {
     return {
       label: "Due today",
 
-      className: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+      className: "text-amber-400",
     };
   }
 
@@ -111,15 +131,44 @@ function getDueDateInfo(issue: Issue) {
         differenceDays === 1 ? "day" : "days"
       }`,
 
-      className: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+      className: "text-amber-300",
     };
   }
 
   return {
-    label: `Due ${formatted}`,
+    label: formatted,
 
-    className: "border-slate-700 bg-slate-800 text-slate-300",
+    className: "text-slate-500",
   };
+}
+
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+}
+
+function getAvatarColor(name: string) {
+  const colors = [
+    "bg-cyan-500",
+    "bg-violet-500",
+    "bg-blue-500",
+    "bg-emerald-500",
+    "bg-rose-500",
+    "bg-amber-500",
+  ];
+
+  const index =
+    Array.from(name).reduce(
+      (total, character) => total + character.charCodeAt(0),
+      0,
+    ) % colors.length;
+
+  return colors[index];
 }
 
 function IssueCard({
@@ -167,16 +216,19 @@ function IssueCard({
 
   const dueDateInfo = getDueDateInfo(issue);
 
+  const priorityStyles = getPriorityStyles(issue.priority);
+
   return (
     <article
       ref={setNodeRef}
       style={style}
-      className={`
-        rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-sm transition
-        ${isDragging ? "opacity-50" : "hover:border-slate-700"}
-      `}
+      className={`group rounded-lg border border-slate-800 bg-slate-900/90 p-3 transition ${
+        isDragging
+          ? "scale-[0.98] opacity-40"
+          : "hover:border-slate-700 hover:bg-slate-900"
+      }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-2">
         <button
           type="button"
           {...attributes}
@@ -184,42 +236,43 @@ function IssueCard({
           onPointerUp={() => {
             onDragActivity(issue.id, false);
           }}
-          className="cursor-grab rounded-md px-1 text-slate-600 hover:bg-slate-800 hover:text-slate-300 active:cursor-grabbing"
+          className="mt-0.5 cursor-grab rounded px-1 py-0.5 text-[12px] leading-none text-slate-700 transition hover:bg-slate-800 hover:text-slate-400 active:cursor-grabbing"
           aria-label={`Drag ${issue.title}`}
         >
-          ⋮⋮
+          ⠿
         </button>
 
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[13px] font-medium leading-5 text-slate-100">
+            {issue.title}
+          </h3>
+
+          {issue.description && (
+            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-600">
+              {issue.description}
+            </p>
+          )}
+        </div>
+
         <span
-          className={`
-            rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide
-            ${getPriorityClasses(issue.priority)}
-          `}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide ${priorityStyles.background} ${priorityStyles.text}`}
         >
+          <span className={`h-1.5 w-1.5 rounded-full ${priorityStyles.dot}`} />
+
           {issue.priority}
         </span>
       </div>
 
-      <h3 className="mt-3 text-sm font-semibold leading-6 text-white">
-        {issue.title}
-      </h3>
-
-      {issue.description && (
-        <p className="mt-2 line-clamp-3 text-sm leading-5 text-slate-500">
-          {issue.description}
-        </p>
-      )}
-
       {issue.issueLabels.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="mt-2.5 flex flex-wrap gap-1">
           {issue.issueLabels.map(({ label }) => (
             <span
               key={label.id}
-              className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+              className="rounded-md px-1.5 py-0.5 text-[9px] font-medium"
               style={{
-                borderColor: label.color,
-
                 color: label.color,
+
+                backgroundColor: `${label.color}18`,
               }}
             >
               {label.name}
@@ -228,81 +281,92 @@ function IssueCard({
         </div>
       )}
 
-      {dueDateInfo && (
-        <div className="mt-3">
-          <span
-            className={`
-              inline-flex rounded-full border px-2.5 py-1 text-xs font-medium
-              ${dueDateInfo.className}
-            `}
-          >
-            {dueDateInfo.label}
-          </span>
-        </div>
-      )}
-
       {(editingUsers.length > 0 || draggingUsers.length > 0) && (
-        <div className="mt-3 space-y-1">
+        <div className="mt-2 space-y-1">
           {editingUsers.map((activity) => (
-            <p
+            <div
               key={`editing-${activity.user.id}`}
-              className="text-xs text-cyan-400"
+              className="flex items-center gap-1.5 text-[10px] text-cyan-400"
             >
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
               {activity.user.name} is editing
-            </p>
+            </div>
           ))}
 
           {draggingUsers.map((activity) => (
-            <p
+            <div
               key={`dragging-${activity.user.id}`}
-              className="text-xs text-violet-400"
+              className="flex items-center gap-1.5 text-[10px] text-violet-400"
             >
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400" />
               {activity.user.name} is moving
-            </p>
+            </div>
           ))}
         </div>
       )}
 
-      <IssueChecklist issueId={issue.id} />
+      <div className="mt-2">
+        <IssueChecklist issueId={issue.id} />
+      </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-800 pt-3">
-        <div className="min-w-0">
+      <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-2.5">
+        <div className="flex min-w-0 items-center gap-2">
           {issue.assignee ? (
             <>
-              <p className="truncate text-xs font-medium text-slate-300">
-                {issue.assignee.name}
-              </p>
+              <div
+                title={issue.assignee.name}
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[8px] font-bold text-white ${getAvatarColor(
+                  issue.assignee.name,
+                )}`}
+              >
+                {getInitials(issue.assignee.name)}
+              </div>
 
-              <p className="truncate text-[10px] text-slate-600">Assignee</p>
+              <span className="max-w-20 truncate text-[10px] text-slate-500">
+                {issue.assignee.name}
+              </span>
             </>
           ) : (
-            <p className="text-xs text-slate-600">Unassigned</p>
+            <span className="text-[10px] text-slate-700">Unassigned</span>
+          )}
+
+          {dueDateInfo && (
+            <>
+              <span className="text-slate-800">•</span>
+
+              <span className={`truncate text-[10px] ${dueDateInfo.className}`}>
+                {dueDateInfo.label}
+              </span>
+            </>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5 opacity-50 transition group-hover:opacity-100">
           <button
             type="button"
+            title="Comments"
             onClick={() => onComments(issue)}
-            className="rounded-md px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-800 hover:text-cyan-300"
+            className="rounded-md px-1.5 py-1 text-[10px] text-slate-500 transition hover:bg-cyan-500/10 hover:text-cyan-300"
           >
-            Comments
+            Chat
           </button>
 
           <button
             type="button"
+            title="Edit issue"
             onClick={() => onEdit(issue)}
-            className="rounded-md px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            className="rounded-md px-1.5 py-1 text-[10px] text-slate-500 transition hover:bg-violet-500/10 hover:text-violet-300"
           >
             Edit
           </button>
 
           <button
             type="button"
+            title="Delete issue"
             onClick={() => onDelete(issue)}
-            className="rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-red-950/40 hover:text-red-300"
+            className="rounded-md px-1.5 py-1 text-[10px] text-slate-600 transition hover:bg-rose-500/10 hover:text-rose-300"
           >
-            Delete
+            ×
           </button>
         </div>
       </div>

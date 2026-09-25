@@ -46,6 +46,15 @@ export interface Workspace {
   members: WorkspaceMember[];
 }
 
+export interface CreatedWorkspace {
+  id: string;
+  name: string;
+  description: string | null;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateWorkspaceInput {
   name: string;
   description?: string;
@@ -70,15 +79,7 @@ interface GetWorkspaceResponse {
 
 interface CreateWorkspaceResponse {
   message: string;
-
-  workspace: {
-    id: string;
-    name: string;
-    description: string | null;
-    ownerId: string;
-    createdAt: string;
-    updatedAt: string;
-  };
+  workspace: CreatedWorkspace;
 }
 
 interface AddWorkspaceMemberResponse {
@@ -143,11 +144,12 @@ export async function getWorkspaceById(
 export async function createWorkspace(
   input: CreateWorkspaceInput,
   accessToken: string,
-): Promise<void> {
+): Promise<CreatedWorkspace> {
   const response = await fetch(`${API_URL}/workspaces`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+
       Authorization: `Bearer ${accessToken}`,
     },
     credentials: "include",
@@ -165,6 +167,8 @@ export async function createWorkspace(
   if (!data.workspace) {
     throw new Error("Invalid workspace response");
   }
+
+  return data.workspace;
 }
 
 export async function addWorkspaceMember(
@@ -176,6 +180,7 @@ export async function addWorkspaceMember(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+
       Authorization: `Bearer ${accessToken}`,
     },
     credentials: "include",
@@ -205,6 +210,7 @@ export async function updateWorkspaceMember(
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+
         Authorization: `Bearer ${accessToken}`,
       },
       credentials: "include",

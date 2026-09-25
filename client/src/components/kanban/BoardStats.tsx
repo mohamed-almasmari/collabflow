@@ -155,358 +155,267 @@ function BoardStats({ issues }: BoardStatsProps) {
     };
   }, [issues]);
 
+  const assignedPercent =
+    stats.total === 0 ? 0 : Math.round((stats.assigned / stats.total) * 100);
+
   return (
-    <section className="mb-6 space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Total Issues
+    <section className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-600">
+            Total
           </p>
 
-          <p className="mt-3 text-3xl font-bold text-white">{stats.total}</p>
+          <p className="mt-1 text-lg font-semibold text-white">{stats.total}</p>
+        </div>
 
-          <p className="mt-2 text-xs text-slate-600">Project workload</p>
-        </article>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
 
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            To Do
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-600">
+              To do
+            </p>
+          </div>
+
+          <p className="mt-1 text-lg font-semibold text-slate-200">
+            {stats.todo}
           </p>
+        </div>
 
-          <p className="mt-3 text-3xl font-bold text-slate-200">{stats.todo}</p>
+        <div className="rounded-lg border border-violet-500/15 bg-violet-500/5 px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
 
-          <p className="mt-2 text-xs text-slate-600">Waiting to start</p>
-        </article>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-violet-400">
+              In progress
+            </p>
+          </div>
 
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
-            In Progress
-          </p>
-
-          <p className="mt-3 text-3xl font-bold text-cyan-300">
+          <p className="mt-1 text-lg font-semibold text-violet-300">
             {stats.inProgress}
           </p>
+        </div>
 
-          <p className="mt-2 text-xs text-slate-600">Currently active</p>
-        </article>
+        <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/5 px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
 
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-            Done
-          </p>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-400">
+              Done
+            </p>
+          </div>
 
-          <p className="mt-3 text-3xl font-bold text-emerald-300">
+          <p className="mt-1 text-lg font-semibold text-emerald-300">
             {stats.done}
           </p>
+        </div>
 
-          <p className="mt-2 text-xs text-slate-600">Completed issues</p>
-        </article>
+        <div className="rounded-lg border border-orange-500/15 bg-orange-500/5 px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
 
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-amber-400">
-            High Priority
-          </p>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-orange-400">
+              Priority
+            </p>
+          </div>
 
-          <p className="mt-3 text-3xl font-bold text-amber-300">
+          <p className="mt-1 text-lg font-semibold text-orange-300">
             {stats.highPriority}
           </p>
+        </div>
 
-          <p className="mt-2 text-xs text-slate-600">High + urgent</p>
-        </article>
-
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-violet-400">
-            Completion
+        <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/5 px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-cyan-400">
+            Complete
           </p>
 
-          <p className="mt-3 text-3xl font-bold text-violet-300">
-            {stats.completionRate}%
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-lg font-semibold text-cyan-300">
+              {stats.completionRate}%
+            </p>
 
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-full rounded-full bg-cyan-400"
+                style={{
+                  width: `${stats.completionRate}%`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/35 p-3">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-semibold text-slate-300">
+                Deadline health
+              </h2>
+
+              <p className="mt-0.5 text-[10px] text-slate-600">
+                Unfinished issue schedule
+              </p>
+            </div>
+
+            {stats.overdue > 0 && (
+              <span className="rounded-md bg-rose-500/10 px-2 py-1 text-[10px] font-medium text-rose-300">
+                {stats.overdue} overdue
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-lg bg-rose-500/5 px-3 py-2">
+              <p className="text-[10px] text-rose-400">Overdue</p>
+
+              <p className="mt-1 text-base font-semibold text-rose-300">
+                {stats.overdue}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-amber-500/5 px-3 py-2">
+              <p className="text-[10px] text-amber-400">Today</p>
+
+              <p className="mt-1 text-base font-semibold text-amber-300">
+                {stats.dueToday}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-cyan-500/5 px-3 py-2">
+              <p className="text-[10px] text-cyan-400">Next 7 days</p>
+
+              <p className="mt-1 text-base font-semibold text-cyan-300">
+                {stats.dueNextSevenDays}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-slate-800/40 px-3 py-2">
+              <p className="text-[10px] text-slate-500">No due date</p>
+
+              <p className="mt-1 text-base font-semibold text-slate-300">
+                {stats.noDueDate}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-800 bg-slate-900/35 p-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-slate-300">Assignment</h2>
+
+            <span className="text-[10px] text-slate-600">
+              {assignedPercent}% assigned
+            </span>
+          </div>
+
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
             <div
-              className="h-full rounded-full bg-violet-400 transition-all duration-300"
+              className="h-full rounded-full bg-cyan-400"
               style={{
-                width: `${stats.completionRate}%`,
+                width: `${assignedPercent}%`,
               }}
             />
           </div>
-        </article>
+
+          <div className="mt-3 flex items-center justify-between text-[11px]">
+            <span className="text-slate-500">Assigned</span>
+
+            <span className="font-medium text-cyan-300">{stats.assigned}</span>
+          </div>
+
+          <div className="mt-1.5 flex items-center justify-between text-[11px]">
+            <span className="text-slate-500">Unassigned</span>
+
+            <span
+              className={
+                stats.unassigned > 0
+                  ? "font-medium text-amber-300"
+                  : "font-medium text-slate-300"
+              }
+            >
+              {stats.unassigned}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
-            Deadlines
-          </p>
-
-          <h2 className="mt-1 text-lg font-semibold text-white">
-            Deadline Health
-          </h2>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Current schedule risk across unfinished issues.
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-red-400">
-              Overdue
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-red-300">
-              {stats.overdue}
-            </p>
-
-            <p className="mt-2 text-xs text-slate-500">
-              Past due and not completed
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">
-              Due Today
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-amber-300">
-              {stats.dueToday}
-            </p>
-
-            <p className="mt-2 text-xs text-slate-500">Needs attention today</p>
-          </div>
-
-          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-cyan-400">
-              Next 7 Days
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-cyan-300">
-              {stats.dueNextSevenDays}
-            </p>
-
-            <p className="mt-2 text-xs text-slate-500">
-              Due today through seven days ahead
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              No Due Date
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-slate-300">
-              {stats.noDueDate}
-            </p>
-
-            <p className="mt-2 text-xs text-slate-500">
-              Issues without a deadline
-            </p>
-          </div>
-        </div>
-
-        {stats.overdue > 0 && (
-          <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-            <p className="text-sm font-medium text-red-300">
-              {stats.overdue}{" "}
-              {stats.overdue === 1
-                ? "unfinished issue is"
-                : "unfinished issues are"}{" "}
-              currently overdue.
-            </p>
-
-            <p className="mt-1 text-xs text-red-200/60">
-              Use the Deadline filter to isolate overdue work.
-            </p>
-          </div>
-        )}
-      </article>
-
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
-              Assignment
-            </p>
-
-            <h2 className="mt-1 text-lg font-semibold text-white">
-              Issue Ownership
-            </h2>
-          </div>
-
-          <div className="mt-5 space-y-5">
+      {stats.workload.length > 0 && (
+        <div className="rounded-lg border border-slate-800 bg-slate-900/35 p-3">
+          <div className="mb-3 flex items-center justify-between">
             <div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Assigned</span>
-
-                <span className="font-semibold text-white">
-                  {stats.assigned}
-                </span>
-              </div>
-
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-cyan-400"
-                  style={{
-                    width:
-                      stats.total === 0
-                        ? "0%"
-                        : `${Math.round(
-                            (stats.assigned / stats.total) * 100,
-                          )}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Unassigned</span>
-
-                <span
-                  className={
-                    stats.unassigned > 0
-                      ? "font-semibold text-amber-300"
-                      : "font-semibold text-slate-300"
-                  }
-                >
-                  {stats.unassigned}
-                </span>
-              </div>
-
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-amber-400"
-                  style={{
-                    width:
-                      stats.total === 0
-                        ? "0%"
-                        : `${Math.round(
-                            (stats.unassigned / stats.total) * 100,
-                          )}%`,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {stats.unassigned > 0 && (
-            <p className="mt-5 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-200">
-              {stats.unassigned}{" "}
-              {stats.unassigned === 1 ? "issue has" : "issues have"} no
-              assignee.
-            </p>
-          )}
-        </article>
-
-        <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
-                Team
-              </p>
-
-              <h2 className="mt-1 text-lg font-semibold text-white">
-                Workload Distribution
+              <h2 className="text-xs font-semibold text-slate-300">
+                Team workload
               </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Active work assigned across the team.
+              <p className="mt-0.5 text-[10px] text-slate-600">
+                Active work by assignee
               </p>
             </div>
 
-            <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-right">
-              <p className="text-xs text-slate-500">Assigned members</p>
-
-              <p className="text-lg font-semibold text-white">
-                {stats.workload.length}
-              </p>
-            </div>
+            <span className="text-[10px] text-slate-600">
+              {stats.workload.length} members
+            </span>
           </div>
 
-          {stats.workload.length === 0 ? (
-            <div className="mt-5 rounded-xl border border-dashed border-slate-700 p-8 text-center">
-              <p className="text-sm text-slate-400">
-                No issues are assigned yet.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-5 space-y-3">
-              {stats.workload.map((member) => {
-                const workloadPercent =
-                  stats.maxActive === 0
-                    ? 0
-                    : Math.round((member.active / stats.maxActive) * 100);
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {stats.workload.map((member) => {
+              const workloadPercent =
+                stats.maxActive === 0
+                  ? 0
+                  : Math.round((member.active / stats.maxActive) * 100);
 
-                const isHighestLoad =
-                  stats.maxActive > 0 && member.active === stats.maxActive;
+              return (
+                <div
+                  key={member.id}
+                  className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2.5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-medium text-slate-300">
+                        {member.name}
+                      </p>
 
-                return (
-                  <div
-                    key={member.id}
-                    className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-semibold text-white">
-                            {member.name}
-                          </p>
+                      <p className="mt-0.5 truncate text-[9px] text-slate-700">
+                        {member.email}
+                      </p>
+                    </div>
 
-                          {isHighestLoad && stats.workload.length > 1 && (
-                            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                              Highest load
-                            </span>
-                          )}
-                        </div>
+                    <div className="flex gap-3 text-right">
+                      <div>
+                        <p className="text-[8px] text-slate-600">Active</p>
 
-                        <p className="mt-1 truncate text-xs text-slate-600">
-                          {member.email}
+                        <p className="text-[11px] font-semibold text-cyan-300">
+                          {member.active}
                         </p>
                       </div>
 
-                      <div className="flex gap-5 text-right">
-                        <div>
-                          <p className="text-xs text-slate-500">Active</p>
+                      <div>
+                        <p className="text-[8px] text-slate-600">Done</p>
 
-                          <p className="font-semibold text-cyan-300">
-                            {member.active}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-xs text-slate-500">Done</p>
-
-                          <p className="font-semibold text-emerald-300">
-                            {member.done}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-xs text-slate-500">Total</p>
-
-                          <p className="font-semibold text-white">
-                            {member.total}
-                          </p>
-                        </div>
+                        <p className="text-[11px] font-semibold text-emerald-300">
+                          {member.done}
+                        </p>
                       </div>
                     </div>
-
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className="h-full rounded-full bg-cyan-400 transition-all duration-300"
-                        style={{
-                          width: `${workloadPercent}%`,
-                        }}
-                      />
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </article>
-      </div>
+
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-cyan-400"
+                      style={{
+                        width: `${workloadPercent}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

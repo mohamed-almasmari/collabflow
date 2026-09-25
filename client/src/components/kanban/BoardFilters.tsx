@@ -23,47 +23,30 @@ export type SortOption =
 
 interface BoardFiltersProps {
   searchText: string;
-
   statusFilter: StatusFilter;
-
   priorityFilter: PriorityFilter;
-
   dueDateFilter: DueDateFilter;
-
   assigneeFilter: string;
-
   labelFilter: string;
-
   sortOption: SortOption;
-
   myIssuesOnly: boolean;
-
   members: WorkspaceMember[];
-
   labels: Label[];
-
   filteredCount: number;
-
   totalCount: number;
-
   onSearchChange: (value: string) => void;
-
   onStatusChange: (value: StatusFilter) => void;
-
   onPriorityChange: (value: PriorityFilter) => void;
-
   onDueDateChange: (value: DueDateFilter) => void;
-
   onAssigneeChange: (value: string) => void;
-
   onLabelChange: (value: string) => void;
-
   onSortChange: (value: SortOption) => void;
-
   onMyIssuesChange: (value: boolean) => void;
-
   onClear: () => void;
 }
+
+const controlClasses =
+  "h-9 rounded-lg border border-slate-800 bg-slate-950/70 px-2.5 text-xs text-slate-300 outline-none transition focus:border-cyan-500/60";
 
 function BoardFilters({
   searchText,
@@ -99,228 +82,167 @@ function BoardFilters({
     myIssuesOnly;
 
   return (
-    <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-white">Board Filters</h2>
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="font-medium text-slate-400">{filteredCount}</span>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Showing{" "}
-            <span className="font-medium text-slate-300">{filteredCount}</span>{" "}
-            of <span className="font-medium text-slate-300">{totalCount}</span>{" "}
-            issues
-          </p>
+          <span className="text-slate-700">/</span>
+
+          <span className="text-slate-600">{totalCount} issues</span>
         </div>
 
         {hasFilters && (
           <button
             type="button"
             onClick={onClear}
-            className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white"
+            className="text-[10px] font-medium text-cyan-400 transition hover:text-cyan-300"
           >
             Clear filters
           </button>
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div>
-          <label
-            htmlFor="issue-search"
-            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <div className="relative">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600"
+            aria-hidden="true"
           >
-            Search
-          </label>
+            <circle cx="11" cy="11" r="7" />
+
+            <path d="m16 16 4 4" />
+          </svg>
 
           <input
             id="issue-search"
             type="search"
             value={searchText}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search issues..."
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-500"
+            placeholder="Search issues"
+            className={`${controlClasses} w-full pl-9`}
           />
         </div>
 
-        <div>
-          <label
-            htmlFor="status-filter"
-            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
-          >
-            Status
-          </label>
+        <select
+          id="status-filter"
+          value={statusFilter}
+          onChange={(event) =>
+            onStatusChange(event.target.value as StatusFilter)
+          }
+          className={`${controlClasses} w-full`}
+        >
+          <option value="ALL">All statuses</option>
 
-          <select
-            id="status-filter"
-            value={statusFilter}
-            onChange={(event) =>
-              onStatusChange(event.target.value as StatusFilter)
-            }
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All statuses</option>
+          <option value="TODO">To do</option>
 
-            <option value="TODO">To Do</option>
+          <option value="IN_PROGRESS">In progress</option>
 
-            <option value="IN_PROGRESS">In Progress</option>
+          <option value="DONE">Done</option>
+        </select>
 
-            <option value="DONE">Done</option>
-          </select>
-        </div>
+        <select
+          id="priority-filter"
+          value={priorityFilter}
+          onChange={(event) =>
+            onPriorityChange(event.target.value as PriorityFilter)
+          }
+          className={`${controlClasses} w-full`}
+        >
+          <option value="ALL">All priorities</option>
 
-        <div>
-          <label
-            htmlFor="priority-filter"
-            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
-          >
-            Priority
-          </label>
+          <option value="LOW">Low</option>
 
-          <select
-            id="priority-filter"
-            value={priorityFilter}
-            onChange={(event) =>
-              onPriorityChange(event.target.value as PriorityFilter)
-            }
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All priorities</option>
+          <option value="MEDIUM">Medium</option>
 
-            <option value="LOW">Low</option>
+          <option value="HIGH">High</option>
 
-            <option value="MEDIUM">Medium</option>
+          <option value="URGENT">Urgent</option>
+        </select>
 
-            <option value="HIGH">High</option>
+        <select
+          id="due-date-filter"
+          value={dueDateFilter}
+          onChange={(event) =>
+            onDueDateChange(event.target.value as DueDateFilter)
+          }
+          className={`${controlClasses} w-full`}
+        >
+          <option value="ALL">All deadlines</option>
 
-            <option value="URGENT">Urgent</option>
-          </select>
-        </div>
+          <option value="OVERDUE">Overdue</option>
 
-        <div>
-          <label
-            htmlFor="due-date-filter"
-            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
-          >
-            Deadline
-          </label>
+          <option value="TODAY">Due today</option>
 
-          <select
-            id="due-date-filter"
-            value={dueDateFilter}
-            onChange={(event) =>
-              onDueDateChange(event.target.value as DueDateFilter)
-            }
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All deadlines</option>
+          <option value="NEXT_7_DAYS">Next 7 days</option>
 
-            <option value="OVERDUE">Overdue</option>
+          <option value="NO_DUE_DATE">No due date</option>
+        </select>
 
-            <option value="TODAY">Due today</option>
+        <select
+          id="assignee-filter"
+          value={assigneeFilter}
+          onChange={(event) => onAssigneeChange(event.target.value)}
+          className={`${controlClasses} w-full`}
+        >
+          <option value="ALL">All assignees</option>
 
-            <option value="NEXT_7_DAYS">Due next 7 days</option>
+          <option value="UNASSIGNED">Unassigned</option>
 
-            <option value="NO_DUE_DATE">No due date</option>
-          </select>
-        </div>
+          {members.map((member) => (
+            <option key={member.user.id} value={member.user.id}>
+              {member.user.name}
+            </option>
+          ))}
+        </select>
 
-        <div>
-          <label
-            htmlFor="assignee-filter"
-            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
-          >
-            Assignee
-          </label>
+        <select
+          id="label-filter"
+          value={labelFilter}
+          onChange={(event) => onLabelChange(event.target.value)}
+          className={`${controlClasses} w-full`}
+        >
+          <option value="ALL">All labels</option>
 
-          <select
-            id="assignee-filter"
-            value={assigneeFilter}
-            onChange={(event) => onAssigneeChange(event.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All assignees</option>
+          {labels.map((label) => (
+            <option key={label.id} value={label.id}>
+              {label.name}
+            </option>
+          ))}
+        </select>
 
-            <option value="UNASSIGNED">Unassigned</option>
+        <select
+          id="sort-filter"
+          value={sortOption}
+          onChange={(event) => onSortChange(event.target.value as SortOption)}
+          className={`${controlClasses} w-full`}
+        >
+          <option value="BOARD">Board order</option>
 
-            {members.map((member) => (
-              <option key={member.user.id} value={member.user.id}>
-                {member.user.name}
-              </option>
-            ))}
-          </select>
-        </div>
+          <option value="PRIORITY">Priority</option>
 
-        <div>
-          <label
-            htmlFor="label-filter"
-            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
-          >
-            Label
-          </label>
+          <option value="DUE_DATE">Due date</option>
 
-          <select
-            id="label-filter"
-            value={labelFilter}
-            onChange={(event) => onLabelChange(event.target.value)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All labels</option>
+          <option value="UPDATED_DESC">Recently updated</option>
 
-            {labels.map((label) => (
-              <option key={label.id} value={label.id}>
-                {label.name}
-              </option>
-            ))}
-          </select>
-        </div>
+          <option value="UPDATED_ASC">Oldest updated</option>
 
-        <div>
-          <label
-            htmlFor="sort-filter"
-            className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
-          >
-            Sort
-          </label>
+          <option value="TITLE">Title A–Z</option>
+        </select>
 
-          <select
-            id="sort-filter"
-            value={sortOption}
-            onChange={(event) => onSortChange(event.target.value as SortOption)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500"
-          >
-            <option value="BOARD">Board order</option>
-
-            <option value="PRIORITY">Priority</option>
-
-            <option value="DUE_DATE">Due date</option>
-
-            <option value="UPDATED_DESC">Recently updated</option>
-
-            <option value="UPDATED_ASC">Oldest updated</option>
-
-            <option value="TITLE">Title A–Z</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="mt-4 border-t border-slate-800 pt-4">
-        <label className="inline-flex cursor-pointer items-center gap-3">
+        <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-3">
           <input
             type="checkbox"
             checked={myIssuesOnly}
             onChange={(event) => onMyIssuesChange(event.target.checked)}
-            className="h-4 w-4 rounded border-slate-600 bg-slate-950"
+            className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 accent-cyan-400"
           />
 
-          <div>
-            <span className="text-sm font-medium text-slate-200">
-              My Issues
-            </span>
-
-            <p className="text-xs text-slate-500">
-              Only show issues assigned to me
-            </p>
-          </div>
+          <span className="text-xs text-slate-400">My issues</span>
         </label>
       </div>
     </section>
