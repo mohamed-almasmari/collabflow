@@ -12,40 +12,37 @@ export interface IssueUser {
 
 export interface Issue {
   id: string;
-
   title: string;
-
   description: string | null;
 
   status: IssueStatus;
-
   priority: IssuePriority;
 
   position: number;
 
+  dueDate: string | null;
+
   projectId: string;
-
   createdById: string;
-
   assigneeId: string | null;
 
   createdAt: string;
-
   updatedAt: string;
 
   createdBy: IssueUser;
-
   assignee: IssueUser | null;
 }
 
 export interface CreateIssueInput {
   title: string;
 
-  description?: string;
+  description?: string | null;
 
   priority?: IssuePriority;
 
   assigneeId?: string | null;
+
+  dueDate?: string | null;
 }
 
 export interface UpdateIssueInput {
@@ -53,43 +50,29 @@ export interface UpdateIssueInput {
 
   description?: string | null;
 
-  status?: IssueStatus;
-
   priority?: IssuePriority;
 
+  status?: IssueStatus;
+
   assigneeId?: string | null;
+
+  dueDate?: string | null;
 }
 
-interface GetIssuesResponse {
-  issues: Issue[];
-}
-
-interface CreateIssueResponse {
-  message: string;
-
-  issue: Issue;
-}
-
-interface UpdateIssueResponse {
-  message: string;
-
-  issue: Issue;
-}
-
-interface MoveIssueInput {
+export interface MoveIssueInput {
   status: IssueStatus;
 
   position: number;
 }
 
-interface MoveIssueResponse {
-  message: string;
-
-  issue: Issue;
+interface IssuesResponse {
+  issues: Issue[];
 }
 
-interface DeleteIssueResponse {
-  message: string;
+interface IssueResponse {
+  message?: string;
+
+  issue: Issue;
 }
 
 interface ApiErrorResponse {
@@ -99,8 +82,6 @@ interface ApiErrorResponse {
 }
 
 export class IssueConflictError extends Error {
-  code = "ISSUE_EDIT_CONFLICT";
-
   constructor(message: string) {
     super(message);
 
@@ -108,9 +89,15 @@ export class IssueConflictError extends Error {
   }
 }
 
+async function getErrorData(response: Response): Promise<ApiErrorResponse> {
+  return (await response.json().catch(() => null)) ?? {};
+}
+
 export async function getIssues(
   workspaceId: string,
+
   projectId: string,
+
   accessToken: string,
 ): Promise<Issue[]> {
   const response = await fetch(
@@ -127,22 +114,56 @@ export async function getIssues(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
+    const data = await getErrorData(response);
 
-    throw new Error(data?.message ?? "Unable to load issues");
+    throw new Error(data.message ?? "Unable to load issues");
   }
 
-  const data: GetIssuesResponse = await response.json();
+  const data: IssuesResponse = await response.json();
 
   return data.issues;
 }
 
+export async function getIssueById(
+  workspaceId: string,
+
+  projectId: string,
+
+  issueId: string,
+
+  accessToken: string,
+): Promise<Issue> {
+  const response = await fetch(
+    `${API_URL}/workspaces/${workspaceId}/projects/${projectId}/issues/${issueId}`,
+    {
+      method: "GET",
+
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+
+      credentials: "include",
+    },
+  );
+
+  if (!response.ok) {
+    const data = await getErrorData(response);
+
+    throw new Error(data.message ?? "Unable to load issue");
+  }
+
+  const data: IssueResponse = await response.json();
+
+  return data.issue;
+}
+
 export async function createIssue(
   workspaceId: string,
+
   projectId: string,
+
   input: CreateIssueInput,
+
   accessToken: string,
 ): Promise<Issue> {
   const response = await fetch(
@@ -163,24 +184,27 @@ export async function createIssue(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
+    const data = await getErrorData(response);
 
-    throw new Error(data?.message ?? "Unable to create issue");
+    throw new Error(data.message ?? "Unable to create issue");
   }
 
-  const data: CreateIssueResponse = await response.json();
+  const data: IssueResponse = await response.json();
 
   return data.issue;
 }
 
 export async function updateIssue(
   workspaceId: string,
+
   projectId: string,
+
   issueId: string,
+
   input: UpdateIssueInput,
-  expectedUpdatedAt: string,
+
+  currentUpdatedAt: string,
+
   accessToken: string,
 ): Promise<Issue> {
   const response = await fetch(
@@ -193,7 +217,7 @@ export async function updateIssue(
 
         Authorization: `Bearer ${accessToken}`,
 
-        "If-Unmodified-Since": expectedUpdatedAt,
+        "If-Unmodified-Since": currentUpdatedAt,
       },
 
       credentials: "include",
@@ -202,30 +226,34 @@ export async function updateIssue(
     },
   );
 
-  if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
+  if (response.status === 409) {
+    const data = await getErrorData(response);
 
-    if (response.status === 409 && data?.code === "ISSUE_EDIT_CONFLICT") {
-      throw new IssueConflictError(
-        data.message ?? "This issue was changed by another collaborator.",
-      );
-    }
-
-    throw new Error(data?.message ?? "Unable to update issue");
+    throw new IssueConflictError(
+      data.message ?? "This issue was changed by another collaborator.",
+    );
   }
 
-  const data: UpdateIssueResponse = await response.json();
+  if (!response.ok) {
+    const data = await getErrorData(response);
+
+    throw new Error(data.message ?? "Unable to update issue");
+  }
+
+  const data: IssueResponse = await response.json();
 
   return data.issue;
 }
 
 export async function moveIssue(
   workspaceId: string,
+
   projectId: string,
+
   issueId: string,
+
   input: MoveIssueInput,
+
   accessToken: string,
 ): Promise<Issue> {
   const response = await fetch(
@@ -246,22 +274,23 @@ export async function moveIssue(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
+    const data = await getErrorData(response);
 
-    throw new Error(data?.message ?? "Unable to move issue");
+    throw new Error(data.message ?? "Unable to move issue");
   }
 
-  const data: MoveIssueResponse = await response.json();
+  const data: IssueResponse = await response.json();
 
   return data.issue;
 }
 
 export async function deleteIssue(
   workspaceId: string,
+
   projectId: string,
+
   issueId: string,
+
   accessToken: string,
 ): Promise<void> {
   const response = await fetch(
@@ -278,16 +307,8 @@ export async function deleteIssue(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
+    const data = await getErrorData(response);
 
-    throw new Error(data?.message ?? "Unable to delete issue");
-  }
-
-  const data: DeleteIssueResponse = await response.json();
-
-  if (!data.message) {
-    throw new Error("Invalid delete response");
+    throw new Error(data.message ?? "Unable to delete issue");
   }
 }

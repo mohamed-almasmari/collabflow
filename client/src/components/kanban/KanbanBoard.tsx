@@ -1,5 +1,6 @@
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   closestCorners,
   useSensor,
@@ -8,10 +9,13 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 
+import { useState } from "react";
+
 import type { Issue, IssueStatus } from "../../api/issues";
 
 import type { IssueActivity } from "../../socket/socket";
 
+import IssueCard from "./IssueCard";
 import KanbanColumn from "./KanbanColumn";
 
 interface KanbanBoardProps {
@@ -25,26 +29,28 @@ interface KanbanBoardProps {
     position: number,
   ) => Promise<void>;
 
+  onCommentsIssue: (issue: Issue) => void;
+
   onEditIssue: (issue: Issue) => void;
 
   onDeleteIssue: (issue: Issue) => void;
 
-  onCommentsIssue: (issue: Issue) => void;
-
   onDragActivity: (issueId: string, active: boolean) => void;
 }
 
-const statuses: IssueStatus[] = ["TODO", "IN_PROGRESS", "DONE"];
+const columnOrder: IssueStatus[] = ["TODO", "IN_PROGRESS", "DONE"];
 
 function KanbanBoard({
   issues,
   activities,
   onMoveIssue,
+  onCommentsIssue,
   onEditIssue,
   onDeleteIssue,
-  onCommentsIssue,
   onDragActivity,
 }: KanbanBoardProps) {
+  const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -53,70 +59,97 @@ function KanbanBoard({
     }),
   );
 
-  function handleDragStart(event: DragStartEvent) {
-    const issueId = String(event.active.id);
+  function getIssuesByStatus(status: IssueStatus) {
+    return issues
+      .filter((issue) => issue.status === status)
+      .sort((first, second) => first.position - second.position);
+  }
 
-    onDragActivity(issueId, true);
+  function handleDragStart(event: DragStartEvent) {
+    const issue = issues.find(
+      (currentIssue) => currentIssue.id === event.active.id,
+    );
+
+    if (!issue) {
+      return;
+    }
+
+    setActiveIssue(issue);
+
+    onDragActivity(issue.id, true);
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    const issueId = String(active.id);
+    const draggedIssue = issues.find((issue) => issue.id === active.id);
 
-    try {
-      if (!over) {
-        return;
-      }
-
-      const issue = issues.find((item) => item.id === issueId);
-
-      if (!issue) {
-        return;
-      }
-
-      let targetStatus: IssueStatus;
-
-      let targetPosition: number;
-
-      const overId = String(over.id);
-
-      if (statuses.includes(overId as IssueStatus)) {
-        targetStatus = overId as IssueStatus;
-
-        const targetIssues = issues
-          .filter((item) => item.status === targetStatus && item.id !== issueId)
-          .sort((a, b) => a.position - b.position);
-
-        targetPosition = targetIssues.length;
-      } else {
-        const overIssue = issues.find((item) => item.id === overId);
-
-        if (!overIssue) {
-          return;
-        }
-
-        targetStatus = overIssue.status;
-
-        const targetIssues = issues
-          .filter((item) => item.status === targetStatus && item.id !== issueId)
-          .sort((a, b) => a.position - b.position);
-
-        const index = targetIssues.findIndex(
-          (item) => item.id === overIssue.id,
-        );
-
-        targetPosition = index >= 0 ? index : targetIssues.length;
-      }
-
-      if (issue.status === targetStatus && issue.position === targetPosition) {
-        return;
-      }
-
-      await onMoveIssue(issueId, targetStatus, targetPosition);
-    } finally {
-      onDragActivity(issueId, false);
+    if (draggedIssue) {
+      onDragActivity(draggedIssue.id, false);
     }
+
+    setActiveIssue(null);
+
+    if (!over || !draggedIssue) {
+      return;
+    }
+
+    let targetStatus: IssueStatus;
+
+    let targetPosition: number;
+
+    const overIssue = issues.find((issue) => issue.id === over.id);
+
+    if (overIssue) {
+      targetStatus = overIssue.status;
+
+      const targetIssues = getIssuesByStatus(targetStatus);
+
+      const overIndex = targetIssues.findIndex(
+        (issue) => issue.id === overIssue.id,
+      );
+
+      targetPosition = overIndex >= 0 ? overIndex : targetIssues.length;
+    } else {
+      const possibleStatus = String(over.id) as IssueStatus;
+
+      if (!columnOrder.includes(possibleStatus)) {
+        return;
+      }
+
+      targetStatus = possibleStatus;
+
+      targetPosition = getIssuesByStatus(targetStatus).length;
+    }
+
+    const sourceIssues = getIssuesByStatus(draggedIssue.status);
+
+    const sourceIndex = sourceIssues.findIndex(
+      (issue) => issue.id === draggedIssue.id,
+    );
+
+    if (
+      draggedIssue.status === targetStatus &&
+      sourceIndex === targetPosition
+    ) {
+      return;
+    }
+
+    if (draggedIssue.status === targetStatus && sourceIndex < targetPosition) {
+      targetPosition -= 1;
+    }
+
+    targetPosition = Math.max(0, targetPosition);
+
+    await onMoveIssue(draggedIssue.id, targetStatus, targetPosition);
+  }
+
+  function handleDragCancel() {
+    if (activeIssue) {
+      onDragActivity(activeIssue.id, false);
+    }
+
+    setActiveIssue(null);
   }
 
   return (
@@ -124,44 +157,60 @@ function KanbanBoard({
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
-      onDragCancel={(event) => {
-        onDragActivity(String(event.active.id), false);
-      }}
       onDragEnd={(event) => {
         void handleDragEnd(event);
       }}
+      onDragCancel={handleDragCancel}
     >
       <div className="grid gap-5 lg:grid-cols-3">
         <KanbanColumn
           title="To Do"
           status="TODO"
-          issues={issues}
+          issues={getIssuesByStatus("TODO")}
           activities={activities}
           onCommentsIssue={onCommentsIssue}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
+          onDragActivity={onDragActivity}
         />
 
         <KanbanColumn
           title="In Progress"
           status="IN_PROGRESS"
-          issues={issues}
+          issues={getIssuesByStatus("IN_PROGRESS")}
           activities={activities}
           onCommentsIssue={onCommentsIssue}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
+          onDragActivity={onDragActivity}
         />
 
         <KanbanColumn
           title="Done"
           status="DONE"
-          issues={issues}
+          issues={getIssuesByStatus("DONE")}
           activities={activities}
           onCommentsIssue={onCommentsIssue}
           onEditIssue={onEditIssue}
           onDeleteIssue={onDeleteIssue}
+          onDragActivity={onDragActivity}
         />
       </div>
+
+      <DragOverlay>
+        {activeIssue ? (
+          <div className="w-[320px]">
+            <IssueCard
+              issue={activeIssue}
+              activities={[]}
+              onComments={() => {}}
+              onEdit={() => {}}
+              onDelete={() => {}}
+              onDragActivity={() => {}}
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
