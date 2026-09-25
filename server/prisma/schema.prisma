@@ -117,7 +117,9 @@ model Project {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User      @relation("ProjectCreator", fields: [createdById], references: [id])
 
-  issues        Issue[]
+  issues Issue[]
+  labels Label[]
+
   notifications Notification[]
 
   @@index([workspaceId])
@@ -131,8 +133,7 @@ model Issue {
   status      IssueStatus   @default(TODO)
   priority    IssuePriority @default(MEDIUM)
   position    Int           @default(0)
-
-  dueDate DateTime? @db.Date
+  dueDate     DateTime?     @db.Date
 
   projectId   String
   createdById String
@@ -145,6 +146,8 @@ model Issue {
   createdBy User    @relation("IssueCreator", fields: [createdById], references: [id])
   assignee  User?   @relation("IssueAssignee", fields: [assigneeId], references: [id])
 
+  issueLabels IssueLabel[]
+
   comments      Comment[]
   notifications Notification[]
 
@@ -154,6 +157,33 @@ model Issue {
   @@index([status])
   @@index([dueDate])
   @@index([projectId, status, position])
+}
+
+model Label {
+  id        String   @id @default(uuid())
+  name      String
+  color     String
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  issueLabels IssueLabel[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+model IssueLabel {
+  issueId String
+  labelId String
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([issueId, labelId])
+  @@index([labelId])
 }
 
 model Comment {

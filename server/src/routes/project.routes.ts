@@ -11,7 +11,8 @@ import {
 
 import { requireAuth } from "../middleware/auth.middleware.js";
 
-import issueRoutes from "./issue.routers.js"; 
+import issueRoutes from "./issue.routers.js";
+import labelRoutes from "./label.routes.js";
 
 const router = Router({
   mergeParams: true,
@@ -22,6 +23,8 @@ router.get("/", requireAuth, getProjects);
 router.post("/", requireAuth, createProject);
 
 router.get("/:projectId/activity", requireAuth, getProjectActivity);
+
+router.use("/:projectId/labels", labelRoutes);
 
 router.use("/:projectId/issues", issueRoutes);
 

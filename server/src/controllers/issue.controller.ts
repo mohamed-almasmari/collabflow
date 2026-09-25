@@ -98,6 +98,29 @@ async function validateAssignee(
   return Boolean(membership);
 }
 
+async function validateLabels(
+  projectId: string,
+  labelIds: string[] | undefined,
+) {
+  if (!labelIds || labelIds.length === 0) {
+    return true;
+  }
+
+  const uniqueLabelIds = [...new Set(labelIds)];
+
+  const count = await prisma.label.count({
+    where: {
+      projectId,
+
+      id: {
+        in: uniqueLabelIds,
+      },
+    },
+  });
+
+  return count === uniqueLabelIds.length;
+}
+
 const issueInclude = {
   createdBy: {
     select: {
@@ -112,6 +135,12 @@ const issueInclude = {
       id: true,
       name: true,
       email: true,
+    },
+  },
+
+  issueLabels: {
+    include: {
+      label: true,
     },
   },
 } as const;
@@ -313,6 +342,18 @@ export async function createIssue(req: AuthenticatedRequest, res: Response) {
       return;
     }
 
+    const labelsValid = await validateLabels(projectId, parsed.data.labelIds);
+
+    if (!labelsValid) {
+      res.status(400).json({
+        message: "One or more labels do not belong to this project",
+      });
+
+      return;
+    }
+
+    const uniqueLabelIds = [...new Set(parsed.data.labelIds ?? [])];
+
     const lastIssue = await prisma.issue.findFirst({
       where: {
         projectId,
@@ -348,6 +389,12 @@ export async function createIssue(req: AuthenticatedRequest, res: Response) {
         createdById: userId,
 
         assigneeId: parsed.data.assigneeId ?? null,
+
+        issueLabels: {
+          create: uniqueLabelIds.map((labelId) => ({
+            labelId,
+          })),
+        },
       },
 
       include: issueInclude,
@@ -454,41 +501,99 @@ export async function updateIssue(req: AuthenticatedRequest, res: Response) {
       return;
     }
 
-    const issue = await prisma.issue.update({
+    const labelsValid = await validateLabels(projectId, parsed.data.labelIds);
+
+    if (!labelsValid) {
+      res.status(400).json({
+        message: "One or more labels do not belong to this project",
+      });
+
+      return;
+    }
+
+    const uniqueLabelIds =
+      parsed.data.labelIds !== undefined
+        ? [...new Set(parsed.data.labelIds)]
+        : undefined;
+
+    await prisma.$transaction(async (transaction) => {
+      if (uniqueLabelIds !== undefined) {
+        await transaction.issueLabel.deleteMany({
+          where: {
+            issueId,
+          },
+        });
+
+        if (uniqueLabelIds.length > 0) {
+          await transaction.issueLabel.createMany({
+            data: uniqueLabelIds.map((labelId) => ({
+              issueId,
+              labelId,
+            })),
+          });
+        }
+      }
+
+      await transaction.issue.update({
+        where: {
+          id: issueId,
+        },
+
+        data: {
+          ...(parsed.data.title !== undefined
+            ? {
+                title: parsed.data.title,
+              }
+            : {}),
+
+          ...(parsed.data.description !== undefined
+            ? {
+                description: parsed.data.description,
+              }
+            : {}),
+
+          ...(parsed.data.priority !== undefined
+            ? {
+                priority: parsed.data.priority,
+              }
+            : {}),
+
+          ...(parsed.data.status !== undefined
+            ? {
+                status: parsed.data.status,
+              }
+            : {}),
+
+          ...(parsed.data.assigneeId !== undefined
+            ? {
+                assigneeId: parsed.data.assigneeId,
+              }
+            : {}),
+
+          ...(parsed.data.dueDate !== undefined
+            ? {
+                dueDate: parseDueDate(parsed.data.dueDate),
+              }
+            : {}),
+        },
+      });
+    });
+
+    const issue = await prisma.issue.findUnique({
       where: {
         id: issueId,
       },
 
-      data: {
-        ...(parsed.data.title !== undefined && {
-          title: parsed.data.title,
-        }),
-
-        ...(parsed.data.description !== undefined && {
-          description: parsed.data.description,
-        }),
-
-        ...(parsed.data.priority !== undefined && {
-          priority: parsed.data.priority,
-        }),
-
-        ...(parsed.data.status !== undefined && {
-          status: parsed.data.status,
-        }),
-
-        ...(parsed.data.assigneeId !== undefined && {
-          assigneeId: parsed.data.assigneeId,
-        }),
-
-        ...(parsed.data.dueDate !== undefined
-          ? {
-              dueDate: parseDueDate(parsed.data.dueDate),
-            }
-          : {}),
-      },
-
       include: issueInclude,
     });
+
+    if (!issue) {
+      res.status(404).json({
+        message: "Issue not found",
+      });
+
+      return;
+    }
 
     res.status(200).json({
       message: "Issue updated successfully",

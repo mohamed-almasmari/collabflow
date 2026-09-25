@@ -10,12 +10,24 @@ export interface IssueUser {
   email: string;
 }
 
+export interface IssueLabel {
+  id: string;
+  name: string;
+  color: string;
+  projectId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Issue {
   id: string;
+
   title: string;
+
   description: string | null;
 
   status: IssueStatus;
+
   priority: IssuePriority;
 
   position: number;
@@ -23,14 +35,22 @@ export interface Issue {
   dueDate: string | null;
 
   projectId: string;
+
   createdById: string;
+
   assigneeId: string | null;
 
   createdAt: string;
+
   updatedAt: string;
 
   createdBy: IssueUser;
+
   assignee: IssueUser | null;
+
+  issueLabels: {
+    label: IssueLabel;
+  }[];
 }
 
 export interface CreateIssueInput {
@@ -43,6 +63,8 @@ export interface CreateIssueInput {
   assigneeId?: string | null;
 
   dueDate?: string | null;
+
+  labelIds?: string[];
 }
 
 export interface UpdateIssueInput {
@@ -57,6 +79,8 @@ export interface UpdateIssueInput {
   assigneeId?: string | null;
 
   dueDate?: string | null;
+
+  labelIds?: string[];
 }
 
 export interface MoveIssueInput {

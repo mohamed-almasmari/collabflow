@@ -11,9 +11,9 @@ import {
 
 import { requireAuth } from "../middleware/auth.middleware.js";
 
-import { recordIssueActivity } from "../middleware/issueActivity.middleware.js";
-
 import { requireCurrentIssueVersion } from "../middleware/issueConflict.middleware.js";
+
+import { recordIssueActivity } from "../middleware/issueActivity.middleware.js";
 
 import commentRoutes from "./comment.routes.js";
 

@@ -105,7 +105,9 @@ function getDueDateInfo(issue: Issue) {
 
   if (differenceDays <= 3) {
     return {
-      label: `Due in ${differenceDays} ${differenceDays === 1 ? "day" : "days"}`,
+      label: `Due in ${differenceDays} ${
+        differenceDays === 1 ? "day" : "days"
+      }`,
 
       className: "border-amber-500/30 bg-amber-500/10 text-amber-200",
     };
@@ -209,6 +211,24 @@ function IssueCard({
         <p className="mt-2 line-clamp-3 text-sm leading-5 text-slate-500">
           {issue.description}
         </p>
+      )}
+
+      {issue.issueLabels.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {issue.issueLabels.map(({ label }) => (
+            <span
+              key={label.id}
+              className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+              style={{
+                borderColor: label.color,
+
+                color: label.color,
+              }}
+            >
+              {label.name}
+            </span>
+          ))}
+        </div>
       )}
 
       {dueDateInfo && (
