@@ -244,9 +244,9 @@ function Sidebar({ open, onClose }: SidebarProps) {
         </div>
 
         <div className="border-t border-slate-800/70 px-3 py-3">
-          <p className="text-[9px] text-slate-700">CollabFlow</p>
+          <p className="text-[9px] text-slate-500">CollabFlow</p>
 
-          <p className="mt-0.5 text-[9px] text-slate-800">
+          <p className="mt-0.5 text-[9px] text-slate-500">
             Collaborative project management
           </p>
         </div>
