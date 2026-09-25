@@ -2,6 +2,8 @@ import { Router } from "express";
 
 import { getProjectActivity } from "../controllers/activity.controller.js";
 
+import { getWorkspaceAnalytics } from "../controllers/analytics.controller.js";
+
 import {
   createProject,
   getProjectById,
@@ -12,6 +14,7 @@ import {
 import { requireAuth } from "../middleware/auth.middleware.js";
 
 import issueRoutes from "./issue.routers.js";
+
 import labelRoutes from "./label.routes.js";
 
 const router = Router({
@@ -21,6 +24,15 @@ const router = Router({
 router.get("/", requireAuth, getProjects);
 
 router.post("/", requireAuth, createProject);
+
+/*
+ * IMPORTANT:
+ * Keep this route above /:projectId.
+ *
+ * Otherwise Express could interpret
+ * "analytics" as a project ID.
+ */
+router.get("/analytics/summary", requireAuth, getWorkspaceAnalytics);
 
 router.get("/:projectId/activity", requireAuth, getProjectActivity);
 
