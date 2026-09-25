@@ -1,4 +1,7 @@
-import type { WorkspaceAnalytics } from "../../api/analytics";
+import type {
+  ProjectHealthStatus,
+  WorkspaceAnalytics,
+} from "../../api/analytics";
 
 interface WorkspaceAnalyticsPanelProps {
   analytics: WorkspaceAnalytics | null;
@@ -64,6 +67,46 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function getHealthClasses(health: ProjectHealthStatus) {
+  switch (health) {
+    case "AT_RISK":
+      return {
+        badge: "bg-rose-500/10 text-rose-300",
+        dot: "bg-rose-400",
+        border: "border-rose-500/15",
+      };
+
+    case "WATCH":
+      return {
+        badge: "bg-amber-500/10 text-amber-300",
+        dot: "bg-amber-400",
+        border: "border-amber-500/15",
+      };
+
+    case "HEALTHY":
+    default:
+      return {
+        badge: "bg-emerald-500/10 text-emerald-300",
+        dot: "bg-emerald-400",
+        border: "border-slate-800",
+      };
+  }
+}
+
+function getHealthLabel(health: ProjectHealthStatus) {
+  switch (health) {
+    case "AT_RISK":
+      return "At risk";
+
+    case "WATCH":
+      return "Watch";
+
+    case "HEALTHY":
+    default:
+      return "Healthy";
+  }
+}
+
 function WorkspaceAnalyticsPanel({
   analytics,
   loading,
@@ -80,7 +123,7 @@ function WorkspaceAnalyticsPanel({
           ))}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 xl:grid-cols-2">
           <div className="h-72 animate-pulse rounded-lg bg-slate-900/60" />
 
           <div className="h-72 animate-pulse rounded-lg bg-slate-900/60" />
@@ -100,6 +143,11 @@ function WorkspaceAnalyticsPanel({
   const maxOpenWorkload = Math.max(
     1,
     ...analytics.workload.map((member) => member.open),
+  );
+
+  const maxRecentCreated = Math.max(
+    1,
+    ...analytics.recentActivity.map((day) => day.created),
   );
 
   return (
@@ -223,17 +271,124 @@ function WorkspaceAnalyticsPanel({
         </article>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+      <div className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-lg border border-slate-800 bg-slate-900/35 p-4">
           <div>
             <h4 className="text-xs font-semibold text-slate-200">
-              Priority distribution
+              Deadline risk
             </h4>
 
             <p className="mt-1 text-[9px] text-slate-600">
-              How work is distributed by urgency.
+              Open work grouped by deadline pressure.
             </p>
           </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-rose-500/10 bg-rose-500/[0.04] p-3">
+              <p className="text-[8px] uppercase tracking-wide text-rose-400">
+                Overdue
+              </p>
+
+              <p className="mt-2 text-xl font-semibold text-rose-300">
+                {analytics.overdueIssues}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-orange-500/10 bg-orange-500/[0.04] p-3">
+              <p className="text-[8px] uppercase tracking-wide text-orange-400">
+                Due today
+              </p>
+
+              <p className="mt-2 text-xl font-semibold text-orange-300">
+                {analytics.dueTodayIssues}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-amber-500/10 bg-amber-500/[0.04] p-3">
+              <p className="text-[8px] uppercase tracking-wide text-amber-400">
+                Next 7 days
+              </p>
+
+              <p className="mt-2 text-xl font-semibold text-amber-300">
+                {analytics.dueSoonIssues}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-slate-800 bg-slate-950/30 p-3">
+              <p className="text-[8px] uppercase tracking-wide text-slate-500">
+                No due date
+              </p>
+
+              <p className="mt-2 text-xl font-semibold text-slate-300">
+                {analytics.noDueDateIssues}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-slate-800 bg-slate-900/35 p-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <h4 className="text-xs font-semibold text-slate-200">
+                Last 7 days
+              </h4>
+
+              <p className="mt-1 text-[9px] text-slate-600">
+                New issues created per day.
+              </p>
+            </div>
+
+            <span className="text-[8px] text-slate-600">Creation activity</span>
+          </div>
+
+          <div className="mt-6 flex h-40 items-end gap-2">
+            {analytics.recentActivity.map((day) => {
+              const height =
+                day.created === 0
+                  ? 4
+                  : Math.max(
+                      14,
+                      Math.round((day.created / maxRecentCreated) * 100),
+                    );
+
+              return (
+                <div
+                  key={day.date}
+                  className="flex min-w-0 flex-1 flex-col items-center"
+                >
+                  <span className="mb-2 text-[8px] font-medium text-slate-400">
+                    {day.created}
+                  </span>
+
+                  <div className="flex h-24 w-full items-end justify-center">
+                    <div
+                      title={`${day.created} issue${day.created === 1 ? "" : "s"} created`}
+                      className="w-full max-w-8 rounded-t bg-gradient-to-t from-cyan-500 to-violet-400 transition-all duration-500"
+                      style={{
+                        height: `${height}%`,
+                      }}
+                    />
+                  </div>
+
+                  <span className="mt-2 text-[8px] text-slate-600">
+                    {day.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <section className="rounded-lg border border-slate-800 bg-slate-900/35 p-4">
+          <h4 className="text-xs font-semibold text-slate-200">
+            Priority distribution
+          </h4>
+
+          <p className="mt-1 text-[9px] text-slate-600">
+            How work is distributed by urgency.
+          </p>
 
           <div className="mt-6 space-y-5">
             <PriorityRow
@@ -306,7 +461,7 @@ function WorkspaceAnalyticsPanel({
                   (member.open / maxOpenWorkload) * 100,
                 );
 
-                const completionPercentage =
+                const memberCompletionRate =
                   member.total === 0
                     ? 0
                     : Math.round((member.done / member.total) * 100);
@@ -389,7 +544,7 @@ function WorkspaceAnalyticsPanel({
                           </span>
 
                           <span className="ml-auto text-slate-600">
-                            {completionPercentage}% complete
+                            {memberCompletionRate}% complete
                           </span>
                         </div>
                       </div>
@@ -412,48 +567,108 @@ function WorkspaceAnalyticsPanel({
         </section>
       </div>
 
-      <section className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900/35">
+      <section className="rounded-lg border border-slate-800 bg-slate-900/35">
         <div className="border-b border-slate-800 px-4 py-3">
           <h4 className="text-xs font-semibold text-slate-200">
-            Workflow health
+            Project health
           </h4>
 
           <p className="mt-0.5 text-[9px] text-slate-600">
-            Current issue distribution across the workspace.
+            Completion, overdue work, and priority pressure by project.
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-3">
-          <div className="border-b border-slate-800 p-4 sm:border-b-0 sm:border-r">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-slate-500">To do</span>
-
-              <span className="text-sm font-semibold text-slate-300">
-                {analytics.todoIssues}
-              </span>
-            </div>
+        {analytics.projectHealth.length === 0 ? (
+          <div className="px-4 py-8 text-center text-[10px] text-slate-600">
+            No projects available.
           </div>
+        ) : (
+          <div className="divide-y divide-slate-800">
+            {analytics.projectHealth.map((project) => {
+              const styles = getHealthClasses(project.health);
 
-          <div className="border-b border-slate-800 p-4 sm:border-b-0 sm:border-r">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-violet-400">In progress</span>
+              return (
+                <div
+                  key={project.projectId}
+                  className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_90px_90px_110px]"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${styles.dot}`}
+                      />
 
-              <span className="text-sm font-semibold text-violet-300">
-                {analytics.inProgressIssues}
-              </span>
-            </div>
+                      <p className="truncate text-[10px] font-semibold text-slate-300">
+                        {project.projectName}
+                      </p>
+
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-wide ${styles.badge}`}
+                      >
+                        {getHealthLabel(project.health)}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="h-full rounded-full bg-emerald-400 transition-all duration-500"
+                        style={{
+                          width: `${project.completionRate}%`,
+                        }}
+                      />
+                    </div>
+
+                    <p className="mt-1 text-[8px] text-slate-600">
+                      {project.completionRate}% complete
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[7px] uppercase tracking-wide text-slate-600">
+                      Open
+                    </p>
+
+                    <p className="mt-1 text-xs font-semibold text-slate-300">
+                      {project.openIssues}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[7px] uppercase tracking-wide text-slate-600">
+                      Overdue
+                    </p>
+
+                    <p
+                      className={`mt-1 text-xs font-semibold ${
+                        project.overdueIssues > 0
+                          ? "text-rose-300"
+                          : "text-slate-300"
+                      }`}
+                    >
+                      {project.overdueIssues}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[7px] uppercase tracking-wide text-slate-600">
+                      High priority
+                    </p>
+
+                    <p
+                      className={`mt-1 text-xs font-semibold ${
+                        project.highPriorityIssues > 0
+                          ? "text-amber-300"
+                          : "text-slate-300"
+                      }`}
+                    >
+                      {project.highPriorityIssues}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          <div className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-emerald-400">Done</span>
-
-              <span className="text-sm font-semibold text-emerald-300">
-                {analytics.doneIssues}
-              </span>
-            </div>
-          </div>
-        </div>
+        )}
       </section>
     </div>
   );

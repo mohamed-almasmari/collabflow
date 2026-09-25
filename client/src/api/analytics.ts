@@ -9,14 +9,50 @@ export interface PriorityDistribution {
 
 export interface WorkloadMember {
   userId: string;
+
   name: string;
+
   email: string;
 
   total: number;
+
   todo: number;
+
   inProgress: number;
+
   done: number;
+
   open: number;
+}
+
+export interface DailyActivity {
+  date: string;
+
+  label: string;
+
+  created: number;
+}
+
+export type ProjectHealthStatus = "HEALTHY" | "WATCH" | "AT_RISK";
+
+export interface ProjectHealth {
+  projectId: string;
+
+  projectName: string;
+
+  totalIssues: number;
+
+  openIssues: number;
+
+  doneIssues: number;
+
+  overdueIssues: number;
+
+  highPriorityIssues: number;
+
+  completionRate: number;
+
+  health: ProjectHealthStatus;
 }
 
 export interface WorkspaceAnalytics {
@@ -38,6 +74,12 @@ export interface WorkspaceAnalytics {
 
   overdueIssues: number;
 
+  dueTodayIssues: number;
+
+  dueSoonIssues: number;
+
+  noDueDateIssues: number;
+
   highPriorityIssues: number;
 
   unassignedIssues: number;
@@ -45,6 +87,10 @@ export interface WorkspaceAnalytics {
   priorityDistribution: PriorityDistribution;
 
   workload: WorkloadMember[];
+
+  recentActivity: DailyActivity[];
+
+  projectHealth: ProjectHealth[];
 }
 
 interface WorkspaceAnalyticsResponse {

@@ -15,6 +15,62 @@ interface WorkloadMember {
   open: number;
 }
 
+interface DailyActivity {
+  date: string;
+  label: string;
+  created: number;
+}
+
+type ProjectHealthStatus = "HEALTHY" | "WATCH" | "AT_RISK";
+
+interface ProjectHealth {
+  projectId: string;
+  projectName: string;
+
+  totalIssues: number;
+  openIssues: number;
+  doneIssues: number;
+
+  overdueIssues: number;
+  highPriorityIssues: number;
+
+  completionRate: number;
+
+  health: ProjectHealthStatus;
+}
+
+function getDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function createRecentActivityDays(numberOfDays: number): DailyActivity[] {
+  const days: DailyActivity[] = [];
+
+  const today = new Date();
+
+  today.setUTCHours(0, 0, 0, 0);
+
+  for (let offset = numberOfDays - 1; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+
+    date.setUTCDate(today.getUTCDate() - offset);
+
+    days.push({
+      date: getDateKey(date),
+
+      label: date.toLocaleDateString("en-US", {
+        weekday: "short",
+
+        timeZone: "UTC",
+      }),
+
+      created: 0,
+    });
+  }
+
+  return days;
+}
+
 export async function getWorkspaceAnalytics(
   req: AuthenticatedRequest,
   res: Response,
@@ -49,51 +105,63 @@ export async function getWorkspaceAnalytics(
       });
     }
 
-    const [totalProjects, activeProjects, archivedProjects, issues] =
-      await Promise.all([
-        prisma.project.count({
-          where: {
+    const [projects, issues] = await Promise.all([
+      prisma.project.findMany({
+        where: {
+          workspaceId,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+
+      prisma.issue.findMany({
+        where: {
+          project: {
             workspaceId,
           },
-        }),
+        },
 
-        prisma.project.count({
-          where: {
-            workspaceId,
-            status: "ACTIVE",
-          },
-        }),
+        select: {
+          id: true,
 
-        prisma.project.count({
-          where: {
-            workspaceId,
-            status: "ARCHIVED",
-          },
-        }),
+          projectId: true,
 
-        prisma.issue.findMany({
-          where: {
-            project: {
-              workspaceId,
+          status: true,
+
+          priority: true,
+
+          dueDate: true,
+
+          createdAt: true,
+
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
             },
           },
+        },
+      }),
+    ]);
 
-          select: {
-            id: true,
-            status: true,
-            priority: true,
-            dueDate: true,
+    const totalProjects = projects.length;
 
-            assignee: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        }),
-      ]);
+    const activeProjects = projects.filter(
+      (project) => project.status === "ACTIVE",
+    ).length;
+
+    const archivedProjects = projects.filter(
+      (project) => project.status === "ARCHIVED",
+    ).length;
 
     const totalIssues = issues.length;
 
@@ -112,11 +180,39 @@ export async function getWorkspaceAnalytics(
 
     today.setUTCHours(0, 0, 0, 0);
 
+    const tomorrow = new Date(today);
+
+    tomorrow.setUTCDate(today.getUTCDate() + 1);
+
+    const nextSevenDays = new Date(today);
+
+    nextSevenDays.setUTCDate(today.getUTCDate() + 7);
+
     const overdueIssues = issues.filter(
       (issue) =>
         issue.status !== "DONE" &&
         issue.dueDate !== null &&
         issue.dueDate < today,
+    ).length;
+
+    const dueTodayIssues = issues.filter(
+      (issue) =>
+        issue.status !== "DONE" &&
+        issue.dueDate !== null &&
+        issue.dueDate >= today &&
+        issue.dueDate < tomorrow,
+    ).length;
+
+    const dueSoonIssues = issues.filter(
+      (issue) =>
+        issue.status !== "DONE" &&
+        issue.dueDate !== null &&
+        issue.dueDate >= tomorrow &&
+        issue.dueDate < nextSevenDays,
+    ).length;
+
+    const noDueDateIssues = issues.filter(
+      (issue) => issue.status !== "DONE" && issue.dueDate === null,
     ).length;
 
     const highPriorityIssues = issues.filter(
@@ -143,6 +239,7 @@ export async function getWorkspaceAnalytics(
     for (const issue of issues) {
       if (!issue.assignee) {
         unassignedIssues += 1;
+
         continue;
       }
 
@@ -170,7 +267,9 @@ export async function getWorkspaceAnalytics(
 
       workloadMap.set(issue.assignee.id, {
         userId: issue.assignee.id,
+
         name: issue.assignee.name,
+
         email: issue.assignee.email,
 
         total: 1,
@@ -192,6 +291,83 @@ export async function getWorkspaceAnalytics(
         first.name.localeCompare(second.name),
     );
 
+    const recentActivity = createRecentActivityDays(7);
+
+    const recentActivityMap = new Map(
+      recentActivity.map((day) => [day.date, day]),
+    );
+
+    for (const issue of issues) {
+      const dateKey = getDateKey(issue.createdAt);
+
+      const day = recentActivityMap.get(dateKey);
+
+      if (day) {
+        day.created += 1;
+      }
+    }
+
+    const projectHealth: ProjectHealth[] = projects.map((project) => {
+      const projectIssues = issues.filter(
+        (issue) => issue.projectId === project.id,
+      );
+
+      const total = projectIssues.length;
+
+      const done = projectIssues.filter(
+        (issue) => issue.status === "DONE",
+      ).length;
+
+      const open = total - done;
+
+      const overdue = projectIssues.filter(
+        (issue) =>
+          issue.status !== "DONE" &&
+          issue.dueDate !== null &&
+          issue.dueDate < today,
+      ).length;
+
+      const highPriority = projectIssues.filter(
+        (issue) =>
+          issue.status !== "DONE" &&
+          (issue.priority === "HIGH" || issue.priority === "URGENT"),
+      ).length;
+
+      const projectCompletionRate =
+        total === 0 ? 0 : Math.round((done / total) * 100);
+
+      let health: ProjectHealthStatus = "HEALTHY";
+
+      if (
+        overdue >= 2 ||
+        (open > 0 && highPriority >= Math.max(2, Math.ceil(open * 0.5)))
+      ) {
+        health = "AT_RISK";
+      } else if (overdue > 0 || highPriority > 0) {
+        health = "WATCH";
+      }
+
+      return {
+        projectId: project.id,
+
+        projectName: project.name,
+
+        totalIssues: total,
+
+        openIssues: open,
+
+        doneIssues: done,
+
+        overdueIssues: overdue,
+
+        highPriorityIssues: highPriority,
+
+        completionRate: projectCompletionRate,
+
+        health,
+      };
+    });
+
     return res.status(200).json({
       analytics: {
         totalProjects,
@@ -206,12 +382,21 @@ export async function getWorkspaceAnalytics(
         completionRate,
 
         overdueIssues,
+        dueTodayIssues,
+        dueSoonIssues,
+        noDueDateIssues,
+
         highPriorityIssues,
+
         unassignedIssues,
 
         priorityDistribution,
 
         workload,
+
+        recentActivity,
+
+        projectHealth,
       },
     });
   } catch (error) {
