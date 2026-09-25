@@ -29,6 +29,8 @@ import {
   type WorkspaceSummary,
 } from "../../api/workspaces";
 
+import WorkspaceAnalyticsPanel from "../../components/Dashboard/WorkspaceAnalyticsPanel";
+
 import { useAuth } from "../../hooks/useAuth";
 
 import CreateProjectForm from "./CreateProjectForm";
@@ -535,211 +537,15 @@ function DashboardPage() {
                 </h3>
 
                 <p className="mt-0.5 text-[10px] text-slate-600">
-                  Live metrics across all projects in this workspace.
+                  Workload, progress, priority, and deadline health across this
+                  workspace.
                 </p>
               </div>
 
-              {loadingAnalytics ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
-                    <div
-                      key={item}
-                      className="h-24 animate-pulse rounded-lg bg-slate-900/60"
-                    />
-                  ))}
-                </div>
-              ) : analytics ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <article className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-                        Total issues
-                      </p>
-
-                      <span className="h-2 w-2 rounded-full bg-cyan-400" />
-                    </div>
-
-                    <p className="mt-3 text-2xl font-semibold text-white">
-                      {analytics.totalIssues}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-slate-600">
-                      Across all projects
-                    </p>
-                  </article>
-
-                  <article className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-                        To do
-                      </p>
-
-                      <span className="h-2 w-2 rounded-full bg-slate-400" />
-                    </div>
-
-                    <p className="mt-3 text-2xl font-semibold text-slate-200">
-                      {analytics.todoIssues}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-slate-600">
-                      Waiting to start
-                    </p>
-                  </article>
-
-                  <article className="rounded-lg border border-violet-500/10 bg-violet-500/[0.04] p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-violet-400">
-                        In progress
-                      </p>
-
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-30" />
-
-                        <span className="relative h-2 w-2 rounded-full bg-violet-400" />
-                      </span>
-                    </div>
-
-                    <p className="mt-3 text-2xl font-semibold text-violet-300">
-                      {analytics.inProgressIssues}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-slate-600">
-                      Currently active
-                    </p>
-                  </article>
-
-                  <article className="rounded-lg border border-emerald-500/10 bg-emerald-500/[0.04] p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
-                        Done
-                      </p>
-
-                      <span className="text-xs text-emerald-400">✓</span>
-                    </div>
-
-                    <p className="mt-3 text-2xl font-semibold text-emerald-300">
-                      {analytics.doneIssues}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-slate-600">
-                      Completed issues
-                    </p>
-                  </article>
-
-                  <article className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-                    <p className="text-[9px] font-semibold uppercase tracking-wider text-cyan-400">
-                      Completion
-                    </p>
-
-                    <div className="mt-3 flex items-end justify-between">
-                      <p className="text-2xl font-semibold text-cyan-300">
-                        {analytics.completionRate}%
-                      </p>
-
-                      <span className="text-[8px] text-slate-600">
-                        {analytics.doneIssues}/{analytics.totalIssues}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-500"
-                        style={{
-                          width: `${analytics.completionRate}%`,
-                        }}
-                      />
-                    </div>
-                  </article>
-
-                  <article
-                    className={`rounded-lg border p-4 ${
-                      analytics.overdueIssues > 0
-                        ? "border-rose-500/20 bg-rose-500/[0.05]"
-                        : "border-slate-800 bg-slate-900/40"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p
-                        className={`text-[9px] font-semibold uppercase tracking-wider ${
-                          analytics.overdueIssues > 0
-                            ? "text-rose-400"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        Overdue
-                      </p>
-
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          analytics.overdueIssues > 0
-                            ? "bg-rose-400"
-                            : "bg-emerald-400"
-                        }`}
-                      />
-                    </div>
-
-                    <p
-                      className={`mt-3 text-2xl font-semibold ${
-                        analytics.overdueIssues > 0
-                          ? "text-rose-300"
-                          : "text-slate-200"
-                      }`}
-                    >
-                      {analytics.overdueIssues}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-slate-600">
-                      Open issues past due
-                    </p>
-                  </article>
-
-                  <article
-                    className={`rounded-lg border p-4 ${
-                      analytics.highPriorityIssues > 0
-                        ? "border-amber-500/20 bg-amber-500/[0.05]"
-                        : "border-slate-800 bg-slate-900/40"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-amber-400">
-                        High priority
-                      </p>
-
-                      <span className="h-2 w-2 rounded-full bg-amber-400" />
-                    </div>
-
-                    <p className="mt-3 text-2xl font-semibold text-amber-300">
-                      {analytics.highPriorityIssues}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-slate-600">
-                      High + urgent open
-                    </p>
-                  </article>
-
-                  <article className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-blue-400">
-                        Projects
-                      </p>
-
-                      <span className="h-2 w-2 rounded-full bg-blue-400" />
-                    </div>
-
-                    <p className="mt-3 text-2xl font-semibold text-blue-300">
-                      {analytics.activeProjects}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-slate-600">
-                      {analytics.archivedProjects} archived
-                    </p>
-                  </article>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-slate-800 bg-slate-900/30 px-4 py-6 text-center text-xs text-slate-600">
-                  Analytics are not available.
-                </div>
-              )}
+              <WorkspaceAnalyticsPanel
+                analytics={analytics}
+                loading={loadingAnalytics}
+              />
             </section>
 
             <section>

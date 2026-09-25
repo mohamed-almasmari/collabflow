@@ -1,5 +1,24 @@
 const API_URL = "http://localhost:3000/api";
 
+export interface PriorityDistribution {
+  LOW: number;
+  MEDIUM: number;
+  HIGH: number;
+  URGENT: number;
+}
+
+export interface WorkloadMember {
+  userId: string;
+  name: string;
+  email: string;
+
+  total: number;
+  todo: number;
+  inProgress: number;
+  done: number;
+  open: number;
+}
+
 export interface WorkspaceAnalytics {
   totalProjects: number;
 
@@ -20,6 +39,12 @@ export interface WorkspaceAnalytics {
   overdueIssues: number;
 
   highPriorityIssues: number;
+
+  unassignedIssues: number;
+
+  priorityDistribution: PriorityDistribution;
+
+  workload: WorkloadMember[];
 }
 
 interface WorkspaceAnalyticsResponse {
