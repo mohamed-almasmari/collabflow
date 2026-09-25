@@ -19,6 +19,7 @@ interface DailyActivity {
   date: string;
   label: string;
   created: number;
+  completed: number;
 }
 
 type ProjectHealthStatus = "HEALTHY" | "WATCH" | "AT_RISK";
@@ -60,11 +61,11 @@ function createRecentActivityDays(numberOfDays: number): DailyActivity[] {
 
       label: date.toLocaleDateString("en-US", {
         weekday: "short",
-
         timeZone: "UTC",
       }),
 
       created: 0,
+      completed: 0,
     });
   }
 
@@ -131,16 +132,12 @@ export async function getWorkspaceAnalytics(
 
         select: {
           id: true,
-
           projectId: true,
-
           status: true,
-
           priority: true,
-
           dueDate: true,
-
           createdAt: true,
+          completedAt: true,
 
           assignee: {
             select: {
@@ -239,7 +236,6 @@ export async function getWorkspaceAnalytics(
     for (const issue of issues) {
       if (!issue.assignee) {
         unassignedIssues += 1;
-
         continue;
       }
 
@@ -298,12 +294,22 @@ export async function getWorkspaceAnalytics(
     );
 
     for (const issue of issues) {
-      const dateKey = getDateKey(issue.createdAt);
+      const createdDateKey = getDateKey(issue.createdAt);
 
-      const day = recentActivityMap.get(dateKey);
+      const createdDay = recentActivityMap.get(createdDateKey);
 
-      if (day) {
-        day.created += 1;
+      if (createdDay) {
+        createdDay.created += 1;
+      }
+
+      if (issue.completedAt) {
+        const completedDateKey = getDateKey(issue.completedAt);
+
+        const completedDay = recentActivityMap.get(completedDateKey);
+
+        if (completedDay) {
+          completedDay.completed += 1;
+        }
       }
     }
 
@@ -387,7 +393,6 @@ export async function getWorkspaceAnalytics(
         noDueDateIssues,
 
         highPriorityIssues,
-
         unassignedIssues,
 
         priorityDistribution,

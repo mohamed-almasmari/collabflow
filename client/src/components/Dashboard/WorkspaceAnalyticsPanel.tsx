@@ -73,14 +73,12 @@ function getHealthClasses(health: ProjectHealthStatus) {
       return {
         badge: "bg-rose-500/10 text-rose-300",
         dot: "bg-rose-400",
-        border: "border-rose-500/15",
       };
 
     case "WATCH":
       return {
         badge: "bg-amber-500/10 text-amber-300",
         dot: "bg-amber-400",
-        border: "border-amber-500/15",
       };
 
     case "HEALTHY":
@@ -88,7 +86,6 @@ function getHealthClasses(health: ProjectHealthStatus) {
       return {
         badge: "bg-emerald-500/10 text-emerald-300",
         dot: "bg-emerald-400",
-        border: "border-slate-800",
       };
   }
 }
@@ -145,9 +142,19 @@ function WorkspaceAnalyticsPanel({
     ...analytics.workload.map((member) => member.open),
   );
 
-  const maxRecentCreated = Math.max(
+  const maxRecentActivity = Math.max(
     1,
-    ...analytics.recentActivity.map((day) => day.created),
+    ...analytics.recentActivity.flatMap((day) => [day.created, day.completed]),
+  );
+
+  const createdLastSevenDays = analytics.recentActivity.reduce(
+    (total, day) => total + day.created,
+    0,
+  );
+
+  const completedLastSevenDays = analytics.recentActivity.reduce(
+    (total, day) => total + day.completed,
+    0,
   );
 
   return (
@@ -327,28 +334,56 @@ function WorkspaceAnalyticsPanel({
         </section>
 
         <section className="rounded-lg border border-slate-800 bg-slate-900/35 p-4">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h4 className="text-xs font-semibold text-slate-200">
-                Last 7 days
+                Created vs completed
               </h4>
 
               <p className="mt-1 text-[9px] text-slate-600">
-                New issues created per day.
+                Issue flow during the last 7 days.
               </p>
             </div>
 
-            <span className="text-[8px] text-slate-600">Creation activity</span>
+            <div className="flex items-center gap-3 text-[8px]">
+              <div className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+
+                <span className="text-slate-500">Created</span>
+
+                <span className="font-semibold text-cyan-300">
+                  {createdLastSevenDays}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+
+                <span className="text-slate-500">Completed</span>
+
+                <span className="font-semibold text-emerald-300">
+                  {completedLastSevenDays}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6 flex h-40 items-end gap-2">
+          <div className="mt-6 flex h-44 items-end gap-2">
             {analytics.recentActivity.map((day) => {
-              const height =
+              const createdHeight =
                 day.created === 0
-                  ? 4
+                  ? 3
                   : Math.max(
-                      14,
-                      Math.round((day.created / maxRecentCreated) * 100),
+                      12,
+                      Math.round((day.created / maxRecentActivity) * 100),
+                    );
+
+              const completedHeight =
+                day.completed === 0
+                  ? 3
+                  : Math.max(
+                      12,
+                      Math.round((day.completed / maxRecentActivity) * 100),
                     );
 
               return (
@@ -356,16 +391,26 @@ function WorkspaceAnalyticsPanel({
                   key={day.date}
                   className="flex min-w-0 flex-1 flex-col items-center"
                 >
-                  <span className="mb-2 text-[8px] font-medium text-slate-400">
-                    {day.created}
-                  </span>
+                  <div className="mb-2 flex items-center gap-2 text-[7px]">
+                    <span className="text-cyan-300">{day.created}</span>
 
-                  <div className="flex h-24 w-full items-end justify-center">
+                    <span className="text-emerald-300">{day.completed}</span>
+                  </div>
+
+                  <div className="flex h-28 w-full items-end justify-center gap-1">
                     <div
-                      title={`${day.created} issue${day.created === 1 ? "" : "s"} created`}
-                      className="w-full max-w-8 rounded-t bg-gradient-to-t from-cyan-500 to-violet-400 transition-all duration-500"
+                      title={`${day.created} created`}
+                      className="w-full max-w-3 rounded-t bg-cyan-400 transition-all duration-500"
                       style={{
-                        height: `${height}%`,
+                        height: `${createdHeight}%`,
+                      }}
+                    />
+
+                    <div
+                      title={`${day.completed} completed`}
+                      className="w-full max-w-3 rounded-t bg-emerald-400 transition-all duration-500"
+                      style={{
+                        height: `${completedHeight}%`,
                       }}
                     />
                   </div>
