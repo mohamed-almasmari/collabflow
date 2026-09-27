@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/env";
 
 export interface PriorityDistribution {
   LOW: number;
@@ -104,3 +104,4 @@ export async function getWorkspaceAnalytics(
 
   return data.analytics;
 }
+

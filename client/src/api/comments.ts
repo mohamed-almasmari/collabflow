@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/env";
 
 export interface CommentAuthor {
   id: string;
@@ -168,3 +168,4 @@ export async function deleteComment(
     );
   }
 }
+

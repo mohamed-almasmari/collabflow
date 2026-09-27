@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/env";
 
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
 
@@ -123,3 +123,4 @@ export async function createProject(
 
   return data.project;
 }
+

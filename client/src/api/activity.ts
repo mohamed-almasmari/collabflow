@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/env";
 
 export type ActivityAction = "CREATED" | "UPDATED" | "MOVED" | "DELETED";
 
@@ -71,3 +71,4 @@ export async function getProjectActivity(
 
   return data.activity;
 }
+

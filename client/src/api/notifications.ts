@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/env";
 
 export type NotificationType = "COMMENT_MENTION" | "ISSUE_ASSIGNED";
 
@@ -130,3 +130,4 @@ export async function markAllNotificationsRead(
     throw new Error(await getErrorMessage(response));
   }
 }
+

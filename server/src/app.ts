@@ -2,18 +2,20 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 
+import { env } from "./config/env.js";
+
 import authRoutes from "./routes/auth.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import workspaceRoutes from "./routes/workspace.routes.js";
 
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
-
 export function createApp() {
   const app = express();
 
+  app.disable("x-powered-by");
+
   app.use(
     cors({
-      origin: CLIENT_ORIGIN,
+      origin: env.CLIENT_ORIGIN,
       credentials: true,
     }),
   );
@@ -26,6 +28,7 @@ export function createApp() {
     res.status(200).json({
       status: "ok",
       message: "CollabFlow API is running",
+      environment: env.NODE_ENV,
     });
   });
 

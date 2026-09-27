@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/env";
 
 export interface Label {
   id: string;
@@ -68,3 +68,4 @@ export async function createLabel(
 
   return data.label;
 }
+

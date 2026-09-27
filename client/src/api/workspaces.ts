@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+import { API_URL } from "../config/env";
 
 export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -257,3 +257,4 @@ export async function removeWorkspaceMember(
     throw new Error("Invalid remove member response");
   }
 }
+
